@@ -1,0 +1,19 @@
+[package]
+name = "pacman"
+version = "0.1.0"
+authors = ["Zachery Fogg <zach.fogg@uvm.edu>"]
+edition = "2021"
+publish = false
+
+[dependencies]
+serde = "*"
+serde_json = "*"
+serde_derive = "*"
+lazy_static = "*"
+rand = { version = "0.6.3", default-features = false, features=["std"] }
+schemars = "0.6"
+access-json = "0.1"
+
+[dependencies.toybox-core]
+version = "*"
+path = "../core"
