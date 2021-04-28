@@ -11,10 +11,11 @@ breakout = {path = "../tb_breakout", version="*", optional = true}
 space_invaders = {path = "../tb_spaceinvaders", version="*", optional = true}
 gridworld = {path = "../tb_gridworld", version = "*", optional = true}
 pong = {path = "../tb_pong", version = "*", optional = true}
+pacman = {path = "../tb_pacman", version="*", optional=true}
 
 [dependencies.toybox-core]
 path = "../core"
 version="*"
 
 [features]
-default = ["amidar", "breakout", "space_invaders", "gridworld", "pong"]
+default = ["amidar", "breakout", "space_invaders", "gridworld", "pong","pacman"]

@@ -12,6 +12,8 @@ pub fn get_simulation_by_name(name: &str) -> Result<Box<dyn Simulation>, String>
     match name.to_lowercase().as_str() {
         #[cfg(feature = "amidar")]
         "amidar" => Ok(Box::new(amidar::Amidar::default())),
+        #[cfg(feature = "pacman")]
+        "pacman" => Ok(Box::new(pacman::Pacman::default())),
         #[cfg(feature = "breakout")]
         "breakout" => Ok(Box::new(breakout::Breakout::default())),
         #[cfg(feature = "gridworld")]

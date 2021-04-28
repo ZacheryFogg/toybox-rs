@@ -2,7 +2,7 @@
 name = "pacman"
 version = "0.1.0"
 authors = ["Zachery Fogg <zach.fogg@uvm.edu>"]
-edition = "2021"
+edition = "2018"
 publish = false
 
 [dependencies]

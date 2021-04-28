@@ -1,0 +1,72 @@
+ mod screen{}:
+ 
+    I will have to change the game size and other variables to replicate pacman
+
+
+mod raw_images{}:
+
+    I will have to create my own images pixel art. 
+    I will have to change the loaded pictures to mine 
+
+mod images{}:
+
+    This will remain sameish but will have to modify the variable names 
+    to reflect pacman and might have to add additonal variable for new assets
+
+    I will also only have one level of pacman that always looks the same 
+
+mod world {}:
+
+    I will likely change very little in here
+    I will have to change the two constants after that load resources
+
+mod inits {}:
+    
+    Will have to adjust speeds to reflect pacman 
+
+impl Amidar {}: 
+
+    Will have to change type to pacmand and reimplement the colors 
+    
+
+impl Default for Amidar{}:
+
+    Will have to assess all variables implemented here
+    Maybe add stuff like score, bonus, speed 
+
+impl ScreenPoint {}:
+
+impl TilePoint {}:
+
+impl WorldPoint {}: 
+
+    These 3 are unlikely to change much assuming a continue with a tile system
+ 
+impl Tile {}:
+
+    Likely won't change that much 
+
+imple MovementAI {}:
+
+    Will likely leverage this to make AI move, remove chase AI 
+
+
+
+Pacman State: Will be derived from intrinsics of the PacMan type:
+
+lives, score, level, player, enemies, board, board will contain pellets 
+
+each tile may have a pellet or power pellet 
+
+So I will start reading through types.rs
+
+steal this rust implementation 
+
+steal rust implementation and integrate with toybox 
+
+
+Variables I'll need for Pacman struct
+
+Player moves an entire tile at a time
+
+enemy lookup ai, which im not using, is default planned routes that don't care about board 

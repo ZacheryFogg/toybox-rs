@@ -10,14 +10,15 @@ use toybox_core::{AleAction, Direction, Input, QueryError};
 
 use rand::seq::SliceRandom;
 
-// Window constants:
+// this is a public module that is just defining some basic constants about screen size
 pub mod screen {
     // Declare a public constant that is the game size in pixels of two integer32bit vals
-    pub const GAME_SIZE: (i32, i32) = (160, 250);
+    pub const GAME_SIZE: (i32, i32) = (500, 500);
+    // offset of board from left top corner
     pub const BOARD_OFFSET: (i32, i32) = (16, 37);
     pub const PLAYER_SIZE: (i32, i32) = (7, 7);
     pub const ENEMY_SIZE: (i32, i32) = (7, 7);
-    pub const TILE_SIZE: (i32, i32) = (4, 5);
+    pub const TILE_SIZE: (i32, i32) = (8, 8);
 
     // The screen positons of the player live markers 
     pub const LIVES_Y_POS: i32 = 198;
@@ -28,7 +29,7 @@ pub mod screen {
     pub const SCORE_Y_POS: i32 = 198;
     pub const SCORE_X_POS: i32 = LIVES_X_POS - LIVES_X_STEP * 3 - 8;
 }
-// Declar images 
+// Declare module that contains variables for raw images for game gui 
 pub mod raw_images {
     pub const PLAYER_L1: &[u8] = include_bytes!("resources/amidar/player_l1.png");
     pub const PLAYER_L2: &[u8] = include_bytes!("resources/amidar/player_l2.png");
@@ -47,10 +48,14 @@ pub mod raw_images {
     pub const BLOCK_TILE_UNPAINTED_L2: &[u8] =
         include_bytes!("resources/amidar/block_tile_unpainted_l2.png");
 }
+// module 
 pub mod images {
+    // I think that this means we are using everything in parent scope; which is whole file? 
     use super::*;
+    // I think this allows static variables to be init that require functions and other processes to 
+    // occur first
     lazy_static! {
-        // Level 1 images
+        // Level 1 images, static means won't change throughout life time of program
         pub static ref PLAYER_L1: FixedSpriteData =
             FixedSpriteData::load_png(raw_images::PLAYER_L1);
         pub static ref ENEMY_L1: FixedSpriteData = FixedSpriteData::load_png(raw_images::ENEMY_L1);
@@ -83,21 +88,28 @@ pub mod images {
 
     }
 }
-
+// 
 mod world {
+    // this is saying that this mod will use the 'screen' from above mod
     use super::screen;
+    // does not change visual appearence but scaling up makes move slow, so maybe influencing computed
+    // scale but not the GUI appearnece
     pub const SCALE: i32 = 16;
     pub const TILE_SIZE: (i32, i32) = (screen::TILE_SIZE.0 * SCALE, screen::TILE_SIZE.1 * SCALE);
 }
+// get board from txt file representation and enemy positions
+// include_str! gives a utf-8 encoded string. will yield a memory address of static string location?
 pub const AMIDAR_BOARD: &str = include_str!("resources/amidar_default_board");
 pub const AMIDAR_ENEMY_POSITIONS_DATA: &str = include_str!("resources/amidar_enemy_positions");
 
+// mod just initializes speed
 mod inits {
     pub const ENEMY_STARTING_SPEED: i32 = 10;
     pub const PLAYER_SPEED: i32 = 8;
 }
-
+// impl define data type amidar I think
 impl Amidar {
+    // create a function that returns a vector of colors for Amidar 
     pub fn colors(&self) -> Vec<&Color> {
         vec![
             &self.bg_color,
@@ -109,25 +121,28 @@ impl Amidar {
         ]
     }
 }
-
+// implement default method that should returns value of your type that is deault
 impl Default for Amidar {
+    // return default values for type Amidar
     fn default() -> Self {
         Amidar {
-            rand: random::Gen::new_from_seed(13),
-            board: AMIDAR_BOARD.lines().map(|s| s.to_owned()).collect(),
-            player_start: TilePoint::new(31, 15),
-            bg_color: Color::black(),
-            player_color: Color::rgb(255, 255, 153),
-            unpainted_color: Color::rgb(148, 0, 211),
+            rand: random::Gen::new_from_seed(13), // set rand to a seeded value 
+            // map all lines in the string board, for each item in line take ownerhsip and then collect
+            // back into a colloection that is now board
+            board: AMIDAR_BOARD.lines().map(|s| s.to_owned()).collect(), 
+            player_start: TilePoint::new(31, 15), // starting tile of player
+            bg_color: Color::rgb(27, 82, 158), // color of background
+            player_color: Color::rgb(0, 0, 0),
+            unpainted_color: Color::rgb(148, 0, 211), 
             painted_color: Color::rgb(255, 255, 30),
-            enemy_color: Color::rgb(255, 50, 100),
-            inner_painted_color: Color::rgb(255, 255, 0),
+            enemy_color: Color::rgb(255, 0, 255),
+            inner_painted_color: Color::rgb(0, 255, 0),
             start_lives: 3,
             start_jumps: 4,
             chase_time: 10 * 30, // 10 seconds
             chase_score_bonus: 100,
             jump_time: 2 * 30 + 15, // 2.5 seconds
-            render_images: true,
+            render_images: false,
             box_bonus: 50,
             default_board_bugs: true,
             // limit number of junctions remembered to something greater than two.
@@ -143,23 +158,28 @@ impl Default for Amidar {
         }
     }
 }
-
+// create type ScreenPoint. used in WorldPoint type
 impl ScreenPoint {
+    // function returns a ScreenPoint which is two int32(x,y)
     fn new(sx: i32, sy: i32) -> ScreenPoint {
         ScreenPoint { sx, sy }
     }
+    // function returns tupe (sx,sy)
     pub fn pixels(&self) -> (i32, i32) {
         (self.sx, self.sy)
     }
 }
-
+// World point type 
 impl WorldPoint {
+    // function returns WorldPoint which is i32 tuple x,y coord
     fn new(x: i32, y: i32) -> WorldPoint {
         WorldPoint { x, y }
     }
+    // function converts current worldpoint to screen point 
     pub fn to_screen(&self) -> ScreenPoint {
         ScreenPoint::new(self.x / world::SCALE, self.y / world::SCALE)
     }
+    // function converts curr worldpoint to tile point
     pub fn to_tile(&self) -> TilePoint {
         let mut tx = self.x / world::TILE_SIZE.0;
         let mut ty = self.y / world::TILE_SIZE.1;
@@ -171,39 +191,46 @@ impl WorldPoint {
         }
         TilePoint::new(tx, ty)
     }
+    // translate world point by a certain delta 
     pub fn translate(&self, dx: i32, dy: i32) -> WorldPoint {
         WorldPoint::new(self.x + dx, self.y + dy)
     }
 }
-
+// TilePoint type 
 impl TilePoint {
     pub fn new(tx: i32, ty: i32) -> TilePoint {
         TilePoint { tx, ty }
     }
+    // return to manhatan distance(follow gridpath) betwen two tilepoints
     pub fn manhattan_dist(&self, other: &TilePoint) -> i32 {
         (self.tx - other.tx).abs() + (self.ty - other.ty).abs()
     }
+    // create worldpoint out of tilepoint using world scale
     pub fn to_world(&self) -> WorldPoint {
         WorldPoint::new(self.tx * world::TILE_SIZE.0, self.ty * world::TILE_SIZE.1)
     }
+    // translaste tilepoint by certain delta
     pub fn translate(&self, dx: i32, dy: i32) -> TilePoint {
         TilePoint::new(self.tx + dx, self.ty + dy)
     }
+    // step in direction which is inputed from toybox_core and translate 
     pub fn step(&self, dir: Direction) -> TilePoint {
         let (dx, dy) = dir.delta();
         self.translate(dx, dy)
     }
 }
-
+// GridBox type
 impl GridBox {
+    /// create a GridBox out of top left and bottom right tilepoints and bool if trigger chase
     fn new(top_left: TilePoint, bottom_right: TilePoint, triggers_chase: bool) -> GridBox {
         GridBox {
             top_left,
             bottom_right,
-            painted: false,
+            painted: false, // is this gridbox currently painted
             triggers_chase,
         }
     }
+    // check if tilepoint is in gridbox 
     fn matches(&self, tile: &TilePoint) -> bool {
         let x1 = self.top_left.tx;
         let x2 = self.bottom_right.tx;
@@ -240,23 +267,26 @@ impl GridBox {
         false
     }
 }
-
+// implement tiletype
 impl Tile {
+    // take in character rand return a Tile 
     fn new_from_char(c: char) -> Result<Tile, String> {
         match c {
-            '=' => Ok(Tile::Unpainted),
-            'p' => Ok(Tile::Painted),
-            'c' => Ok(Tile::ChaseMarker),
-            ' ' => Ok(Tile::Empty),
+            '=' => Ok(Tile::Unpainted),//tile should be unpainted 
+            'p' => Ok(Tile::Painted), // painted
+            'c' => Ok(Tile::ChaseMarker),//tile triggers chase
+            ' ' => Ok(Tile::Empty),//non movelable area 
             _ => Err(format!("Cannot construct AmidarTile from '{}'", c)),
         }
     }
+    // if tile can be walked on 
     pub fn walkable(self) -> bool {
         match self {
-            Tile::Empty => false,
+            Tile::Empty => false,//if tile is ' ' then not walkable 
             Tile::ChaseMarker | Tile::Painted | Tile::Unpainted => true,
         }
     }
+    // if painted or empty no paint, otherwise needs paint
     pub fn needs_paint(self) -> bool {
         match self {
             Tile::Painted | Tile::Empty => false,
@@ -264,14 +294,16 @@ impl Tile {
         }
     }
 }
-
+// this implements a type MovementAI 
+// there seem to be different types within
 impl MovementAI {
     /// Resetting the mob AI state after player death.
     fn reset(&mut self) {
+        // match which type of MovementAI this 
         match self {
-            MovementAI::Player => {}
+            MovementAI::Player => {} 
             MovementAI::EnemyLookupAI { ref mut next, .. } => {
-                *next = 0;
+                *next = 0; // set next to 0
             }
             MovementAI::EnemyPerimeterAI { .. } => {}
             MovementAI::EnemyAmidarMvmt {
@@ -302,19 +334,21 @@ impl MovementAI {
             }
         }
     }
+    //depending on 
     fn choose_next_tile(
         &mut self,
-        position: &TilePoint,
-        buttons: Input,
-        board: &Board,
-        player: Option<Mob>,
-        rng: &mut random::Gen,
-    ) -> Option<TilePoint> {
+        position: &TilePoint, 
+        buttons: Input, // defined in toybox core 
+        board: &Board, // board define below
+        player: Option<Mob>, // could pass in a mob or not, define below
+        rng: &mut random::Gen, //random number gen 
+    ) -> Option<TilePoint> { // return an optional TilePoint
         match self {
-            &mut MovementAI::Player => {
+            // match what type of player this is
+            &mut MovementAI::Player => { //if player, then take their action and return it
                 let mut input: Option<Direction> = None;
                 if buttons.left {
-                    input = Some(Direction::Left);
+                    input = Some(Direction::Left); //direction is from toybox core 
                 } else if buttons.right {
                     input = Some(Direction::Right);
                 } else if buttons.up {
@@ -323,15 +357,16 @@ impl MovementAI {
                     input = Some(Direction::Down);
                 }
 
-                input.and_then(|dir| {
-                    let target_tile = position.step(dir);
-                    if board.get_tile(&target_tile).walkable() {
+                input.and_then(|dir| { // will return none if input is none 
+                    let target_tile = position.step(dir); // get the target tile that we will end up at
+                    if board.get_tile(&target_tile).walkable() { 
                         Some(target_tile)
                     } else {
                         None
                     }
                 })
             }
+            // use a default preprogrammed positions to just step the ai forward a position 
             &mut MovementAI::EnemyLookupAI {
                 ref mut next,
                 default_route_index,
@@ -344,14 +379,14 @@ impl MovementAI {
                 let perimeter = board.get_perimeter(position);
                 let mut tilepoint = None;
                 for dir in perimeter {
-                    let go = match dir {
+                    let go = match dir { //when hit a perimeter go a certain direction 
                         Direction::Up => Direction::Right,
                         Direction::Down => Direction::Left,
                         Direction::Right => Direction::Down,
                         Direction::Left => Direction::Up,
                     };
                     let tp = board.can_move(position, go);
-                    tilepoint = tilepoint.or(tp)
+                    tilepoint = tilepoint.or(tp)//if it can move, move or stay the same?
                 }
                 tilepoint
             }
@@ -469,18 +504,20 @@ impl MovementAI {
         }
     }
 }
-
+// Mob type 
 impl Mob {
+    // create a new mob that is comprised of MovementAI tpye, WorldPoint and speed 
     fn new(ai: MovementAI, position: WorldPoint, speed: i32) -> Mob {
         Mob {
-            ai,
-            position,
+            ai,//movementAI type 
+            position,//position in world
             step: None,
             caught: false,
             speed,
             history: VecDeque::new(),
         }
     }
+    // create newplayer which is of movement type Player 
     pub fn new_player(position: WorldPoint, speed: i32) -> Mob {
         Mob {
             ai: MovementAI::Player,
@@ -488,7 +525,7 @@ impl Mob {
             step: None,
             caught: false,
             speed,
-            history: VecDeque::new(),
+            history: VecDeque::new(),//history of agents positions 
         }
     }
     fn is_player(&self) -> bool {
@@ -497,6 +534,7 @@ impl Mob {
     fn change_speed(&mut self, new_speed: i32) {
         self.speed = new_speed;
     }
+    // reset agent in world to it's start
     fn reset(&mut self, player_start: &TilePoint, board: &Board) {
         self.step = None;
         self.ai.reset();
@@ -515,7 +553,7 @@ impl Mob {
         };
         self.history.clear();
     }
-
+    // return an optional board update 
     pub fn update(
         &mut self,
         buttons: Input,
@@ -587,6 +625,7 @@ impl Mob {
 }
 
 lazy_static! {
+    //map the input board to a board object
     static ref DEFAULT_BOARD: Board = Board::try_new(
         &AMIDAR_BOARD
             .lines()
@@ -594,6 +633,7 @@ lazy_static! {
             .collect::<Vec<_>>()
     )
     .unwrap();
+    // get default enemy routes from the preprogrammed file. I will not need this for initial implementation
     static ref DEFAULT_ENEMY_ROUTES: Vec<Vec<u32>> = AMIDAR_ENEMY_POSITIONS_DATA
         .lines()
         .map(|enemy_route| {
@@ -606,7 +646,7 @@ lazy_static! {
         })
         .collect();
 }
-
+// 
 impl BoardUpdate {
     fn new() -> BoardUpdate {
         BoardUpdate {
@@ -616,7 +656,7 @@ impl BoardUpdate {
             num_boxes: 0,
             triggers_chase: false,
         }
-    }
+    }//maybe indicates if some significant event happened
     fn happened(&self) -> bool {
         self.junctions.is_some()
             || self.vertical != 0
@@ -624,6 +664,7 @@ impl BoardUpdate {
             || self.num_boxes != 0
             || self.triggers_chase
     }
+    // 
     fn into_option(self) -> Option<Self> {
         if self.happened() {
             Some(self)
@@ -637,6 +678,7 @@ impl Board {
     pub fn fast_new() -> Board {
         DEFAULT_BOARD.clone()
     }
+    // tru to update board: perhpas when something updates
     fn try_new(lines: &[String]) -> Result<Board, String> {
         let mut tiles = Vec::new();
         for line in lines {
@@ -833,7 +875,7 @@ impl Board {
             None
         }
     }
-
+    // give the tile an id
     fn tile_id(&self, tile: &TilePoint) -> Option<u32> {
         if tile.ty < 0
             || tile.tx < 0
@@ -846,7 +888,7 @@ impl Board {
         let x = tile.tx as u32;
         Some(y * self.width + x)
     }
-
+    
     fn get_junction_id(&self, tile: &TilePoint) -> Option<u32> {
         if let Some(num) = self.tile_id(tile) {
             if self.junctions.contains(&num) {
@@ -935,7 +977,7 @@ impl Board {
 
         score_change
     }
-
+    // I won't need most of these 
     pub fn paint(&mut self, tile: &TilePoint) -> bool {
         let val = &mut self.tiles[tile.ty as usize][tile.tx as usize];
         if *val == Tile::Painted {
@@ -978,8 +1020,9 @@ impl Board {
         true
     }
 }
-
+// implementation of the state type 
 impl State {
+    // return a state or an error 
     pub fn try_new(config: &Amidar) -> Result<State, String> {
         let board = Board::try_new(&config.board)?;
         let mut config = config.clone();
@@ -990,7 +1033,7 @@ impl State {
             .map(|ai| board.make_enemy(ai.clone(), config.enemy_starting_speed))
             .collect();
         let player = Mob::new_player(config.player_start.to_world(), config.player_speed);
-
+        // init the core of the state
         let core = StateCore {
             rand: random::Gen::new_child(&mut config.rand),
             lives: config.start_lives,
@@ -1003,7 +1046,7 @@ impl State {
             enemies,
             board,
         };
-
+        
         let mut state = State {
             config,
             state: core,
@@ -1011,6 +1054,7 @@ impl State {
         state.reset();
         Ok(state)
     }
+    // reset the state
     pub fn reset(&mut self) {
         self.state
             .player
@@ -1116,7 +1160,7 @@ impl toybox_core::Simulation for Amidar {
         serde_json::to_string(&schema).expect("JSONSchema should be flawless.")
     }
 }
-
+// this seems to be the where everything is ties together 
 impl toybox_core::State for State
 where
     State: Clone,
