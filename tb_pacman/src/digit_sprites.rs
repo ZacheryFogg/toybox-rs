@@ -7,7 +7,7 @@ pub const DIGIT_HEIGHT: i32 = 7;
 
 lazy_static! {
     static ref DIGIT_SPRITES: Vec<FixedSpriteData> = load_digit_sprites(
-        include_str!("resources/amidar_digit_sprites.txt"),
+        include_str!("resources/pacman_digit_sprites.txt"),
         Color::rgb(255, 255, 153),
         SET,
         IGNORE

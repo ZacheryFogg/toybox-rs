@@ -10,10 +10,10 @@ extern crate rand;
 
 pub mod pacman;
 mod digit_sprites;
-mod typespacman;
+mod types;
 
 
 
 // pub use crate::types::Amidar as Pacman;
-pub use crate::typespacman::Pacman;
-pub use crate::typespacman::State;
+pub use crate::types::Pacman;
+pub use crate::types::State;

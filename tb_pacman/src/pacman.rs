@@ -1,5 +1,5 @@
 use super::digit_sprites::{draw_score, DIGIT_HEIGHT};
-use crate::typespacman::*;
+use crate::types::*;
 use access_json::JSONQuery;
 use serde_json;
 use std::collections::{HashSet, VecDeque};
@@ -80,19 +80,14 @@ mod world {
     pub const SCALE: i32 = 32;
     pub const TILE_SIZE: (i32, i32) = (screen::TILE_SIZE.0 * SCALE, screen::TILE_SIZE.1 * SCALE);
 }
-
-
 // Load board from file
 pub const PACMAN_BOARD: &str = include_str!("resources/pacman_default_board");
 
-
 // Module intiates speed of mobs 
 mod inits {
-    pub const ENEMY_STARTING_SPEED: i32 = 18;
-    pub const PLAYER_SPEED: i32 = 30;
+    pub const ENEMY_STARTING_SPEED: i32 = 20;
+    pub const PLAYER_SPEED: i32 = 19;
 }
-
-
 // Implement Pacman type
 impl Pacman {
     pub fn colors(&self) -> Vec<&Color> {
@@ -301,6 +296,29 @@ impl MovementAI {
                         .filter(|(_, tp)| tp.is_some())
                         .collect();
                     let (d, tp) = eligible.choose(rng).cloned().unwrap();
+
+                    // Try not to choose the opposite direction 
+                    let opposite_dir = match dir {
+                        Direction::Up => Direction::Down,
+                        Direction::Down => Direction::Up,
+                        Direction::Left => Direction::Right,
+                        Direction::Right => Direction::Left,
+                    };
+                    // Choose another direction: If still an opposite direction than accept and continue
+                    // This reduces probability of choosing opposite direction from ~ 1/x to ~ 1/(x^3), where x is possible directions
+                    // I will come back and fix this, but am currently confused on aspects of Rust that make this difficult
+                    if *d == opposite_dir {
+                        // This is horrible code
+                        let (d2, tp2) = eligible.choose(rng).cloned().unwrap();
+                        if *d2 == opposite_dir {
+                            let (d3, tp3) = eligible.choose(rng).cloned().unwrap();
+                            *dir = *d3;
+                            return tp3;
+                        } else {
+                            *dir = *d2;
+                            return tp2;
+                        }
+                    } 
                     // Move to the randomly selected tile point, in its dir.
                     *dir = *d;
                     return tp;
