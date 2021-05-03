@@ -8,8 +8,7 @@ use toybox_core::graphics::{Color, Drawable, FixedSpriteData};
 use toybox_core::random;
 use toybox_core::{AleAction, Direction, Input, QueryError};
 use rand::seq::SliceRandom;
-use std::time::{Duration, SystemTime};
-// use std::thread::sleep;
+use std::time::{SystemTime};
 
 // Module contains basic constants related to GUI
 pub mod screen {
@@ -17,8 +16,8 @@ pub mod screen {
     pub const BOARD_OFFSET: (i32, i32) = (0,0); // Game offset from top-left corner of GUI
     pub const PLAYER_SIZE: (i32, i32) = (8, 8); // Size of non-sprite player - GUI size only - not collision boxes
     pub const ENEMY_SIZE: (i32, i32) = (8, 8);
-    pub const TILE_SIZE: (i32, i32) = (7, 7); // Size of each tile - GUI and Collision 
-    pub const LIVES_Y_POS: i32 = 130; // Position of lives markers
+    pub const TILE_SIZE: (i32, i32) = (6, 7); // Size of each tile - GUI and Collision 
+    pub const LIVES_Y_POS: i32 = 130; // Position of sprites on screen 
     pub const LIVES_X_POS: i32 = 100;
     pub const LIVES_X_STEP: i32 = 16; 
     pub const SCORE_Y_POS: i32 = 130;
@@ -132,6 +131,8 @@ impl Default for Pacman {
             score_increase_base_per_ghost_catch: 200,
             player_speed: inits::PLAYER_SPEED,
             vulnerable_time: 500, // 10 seconds
+            immobilized_time: 150,
+            start_immobilized_base: 100,
             // 4 random agents for now
             enemies: vec![MovementAI::EnemyRandomMvmt {start: TilePoint::new(10, 6), start_dir: Direction::Up, dir: Direction::Up,},
                           MovementAI::EnemyRandomMvmt {start: TilePoint::new(10, 6), start_dir: Direction::Up, dir: Direction::Up,},
@@ -141,26 +142,26 @@ impl Default for Pacman {
     }
 }
 
-// Impl ScreenPoint is used to convert a WorldPoint to the GUI position (pixel)
+// ScreenPoint is used to convert a WorldPoint to the GUI position (pixel)
 impl ScreenPoint {
     // Return a new ScreenPoint
     fn new(sx: i32, sy: i32) -> ScreenPoint {
         ScreenPoint { sx, sy }
     }
-    // Return tuple that is screen point (pixel pos)
+    // Return tuple that is screen pixel pos - used when rendering mobs to screen
     pub fn pixels(&self) -> (i32, i32) {
         (self.sx, self.sy)
     }
 }
 
 
-// Impl WorldPoint: which is the underlying positioning system
+// WorldPoint: which is the underlying positioning system
 impl WorldPoint {
-    // Returns WorldPoint 
+    // Return new WorldPoint 
     fn new(x: i32, y: i32) -> WorldPoint {
         WorldPoint { x, y }
     }
-    // Convert current WorldPoint to ScreenPoint. WorldPoints >= ScreenPoints
+    // Convert current WorldPoint to ScreenPoint
     pub fn to_screen(&self) -> ScreenPoint {
         ScreenPoint::new(self.x / world::SCALE, self.y / world::SCALE)
     }
@@ -206,16 +207,16 @@ impl TilePoint {
     }
 }
 
-// Implement Tile type: 
+// Tile type: tiles are the visually rendered 'tiles' in GUI
 impl Tile {
     fn new_from_char(c: char) -> Result<Tile, String> {
     // Convert character into Tile of certain type
         match c {
             'e' => Ok(Tile::Empty),
-            '=' => Ok(Tile::Pellet), // Empty + pellet
-            'p' => Ok(Tile::PowerPellet), // Empty + power pellet
-            '#' => Ok(Tile::Wall), // Non movelable area 
-            'h' => Ok(Tile::House), // Enemies home
+            '=' => Ok(Tile::Pellet), 
+            'p' => Ok(Tile::PowerPellet), 
+            '#' => Ok(Tile::Wall), 
+            'h' => Ok(Tile::House), 
             't' => Ok(Tile::Teleport),
             _ => Err(format!("Cannot construct AmidarTile from '{}'", c)),
         }
@@ -253,13 +254,13 @@ impl MovementAI {
             }
         }
     }
-    //depending on 
+    //Choose next tile depending on Intelligence type
     fn choose_next_tile(
         &mut self,
         position: &TilePoint, 
         buttons: Input, // defined in toybox core 
         board: &Board, // board define below
-        player: Option<Mob>, // could pass in a mob or not, define below
+        _player: Option<Mob>, // could pass in a mob or not, define below
         rng: &mut random::Gen, //random number gen 
     ) -> Option<TilePoint> { // return an optional TilePoint
         match self {
@@ -310,30 +311,29 @@ impl MovementAI {
     }
 }
 
-// Mob type 
+// Mob type
 impl Mob {
-    // create a new mob that is comprised of MovementAI tpye, WorldPoint and speed 
     fn new(ai: MovementAI, position: WorldPoint, speed: i32) -> Mob {
         Mob {
-            ai,//movementAI type 
-            position,//position in world
+            ai,
+            position,
             step: None,
-            caught: false,
             vulnerable: false,
             speed,
             history: VecDeque::new(),
+            immobilized_timer: 0,
         }
     }
-    // create newplayer which is of movement type Player 
+    // Create newplayer which is of movement type Player 
     pub fn new_player(position: WorldPoint, speed: i32) -> Mob {
         Mob {
             ai: MovementAI::Player,
             position,
             step: None,
-            caught: false,
             vulnerable: false,
             speed,
-            history: VecDeque::new(),//history of agents positions 
+            history: VecDeque::new(),
+            immobilized_timer:0,
         }
     }
     fn is_player(&self) -> bool {
@@ -342,23 +342,19 @@ impl Mob {
     fn change_speed(&mut self, new_speed: i32) {
         self.speed = new_speed;
     }
-    fn teleport(&mut self, board: &Board) {
+    // Teleport a mob from one teleport location to the corresponding position on the opposite side of the board
+    fn teleport(&mut self, _board: &Board) {
         self.step = None; 
-        let mut new_x = 0;
+        let new_x;
         if self.position.to_tile().tx == 0 {
             new_x = 19;
         } else {
             new_x = 1;
         }
         self.position = TilePoint::new(new_x, self.position.to_tile().ty).to_world();
-        // self.position = match self.ai {
-        //     MovementAI::Player => new_position,
-        //     MovementAI::EnemyRandomMvmt { ref start, .. } => start.clone().to_world(),
-        // }
-
     }
     // reset agent in world to it's start
-    fn reset(&mut self, player_start: &TilePoint, board: &Board) {
+    fn reset(&mut self, player_start: &TilePoint, _board: &Board) {
         self.step = None;
         self.ai.reset();
         self.position = match self.ai {
@@ -366,7 +362,6 @@ impl Mob {
             MovementAI::EnemyRandomMvmt { ref start, .. } => start.clone().to_world(),
         };
         self.history.clear();
-        self.caught = false;
         self.vulnerable = false;
     }
     // return an optional board update 
@@ -426,13 +421,7 @@ impl Mob {
         if self.is_player(){
 
             board.check_pellets_every_tile(&mut self.position,&mut self.history).into_option()
-        }
-        // Manage history:
-        // if self.is_player() {
-        //     // Check if based on player history any pellets were collected
-        //     board.check_pellets(&mut self.history).into_option()
-            
-        // } 
+        } 
         else {
             // Each moving object in Amidar keeps track of which junctions it has visited. Here, we
             // make sure that datastructure does not grow unbounded with time; limiting it to
@@ -463,18 +452,15 @@ impl BoardUpdate {
             junctions: None,
             pellets_collected: 0,
             power_pellets_collected:0,
-            teleport: 0,
-            ghosts_consumed: 0,
         }
-    }//maybe indicates if some significant event happened
+    }
+    // Indicate if board should be updated: tiles change
     fn happened(&self) -> bool {
         self.junctions.is_some()
             || self.pellets_collected != 0
             || self.power_pellets_collected != 0
-            || self.ghosts_consumed != 0
-            || self.teleport != 0
     }
-    // 
+    // Turn into option obj
     fn into_option(self) -> Option<Self> {
         if self.happened() {
             Some(self)
@@ -489,7 +475,7 @@ impl Board {
     pub fn fast_new() -> Board {
         DEFAULT_BOARD.clone()
     }
-    // Make a new Board object and return the board and the results
+    // Make a new Board object
     fn try_new(lines: &[String]) -> Result<Board, String> {
         let mut tiles = Vec::new();
         for line in lines {
@@ -506,24 +492,17 @@ impl Board {
             width,
             height,
             junctions: HashSet::new(),
-            // boxes: Vec::new(),
         };
         board.init_junctions();
-        // debug_assert!(board.boxes.is_empty());
-        // board.boxes = board
-        //     .junctions
-        //     .iter()
-        //     .flat_map(|pt| board.junction_corners(*pt))
-        //     .collect();
         Ok(board)
     }
-    // is a corner of the board 
+    // Is a corner of the board 
     fn is_corner(&self, tx: i32, ty: i32) -> bool {
         let last_y = (self.height as i32) - 1;
         let last_x = (self.width as i32) - 1;
         (tx == 0 || tx == last_x) && (ty == 0 || ty == last_y)
     }
-    // can move in a given direction from a tilepoint
+    // Can a Mob move in a given direction from a tilepoint
     fn can_move(&self, position: &TilePoint, dir: Direction) -> Option<TilePoint> {
         let tx = position.tx;
         let ty = position.ty;
@@ -563,35 +542,17 @@ impl Board {
                         let y = y as u32;
                         let x = x as u32;
                         let _ = self.junctions.insert(y * self.width + x);
-                        // if cell == &Tile::ChaseMarker {
-                        //     self.chase_junctions.insert(y * self.width + x);
-                        // }
                     }
                 }
             }
         }
     }
-
-    // fn is_painted(&self, xy: &TilePoint) -> bool {
-    //     self.get_tile(xy) == Tile::Painted
-    // }
-    // fn is_pellet(&self, xy: &TilePoint) -> bool {
-    //     self.get_tile(xy) == Tile::Pellet
-    // }
-    // fn is_power_pellet(&self, xy: &TilePoint) -> bool {
-    //     self.get_tile(xy) == Tile::PowerPellet
-    // }
     fn is_tp(&self, xy: &TilePoint) -> bool {
         self.get_tile(xy) == Tile::Teleport
     }
-    // fn is_house(&self, xy: &TilePoint) -> bool {
-    //     self.get_tile(xy) == Tile::House
-    // }
-    // fn is_wall(&self, xy: &TilePoint) -> bool {
-    //     self.get_tile(xy) == Tile::Wall
-    // }
 
-    // give the tile an id
+
+    // Give a TilePoint an ID
     fn tile_id(&self, tile: &TilePoint) -> Option<u32> {
         if tile.ty < 0
             || tile.tx < 0
@@ -616,19 +577,24 @@ impl Board {
             None
         }
     }
+    // Check the tile player is currently on for collectables
     fn check_pellets_every_tile(&mut self, player_position: &WorldPoint, player_history: &mut VecDeque<u32>) -> BoardUpdate {
         let mut score_change = BoardUpdate::new();
         let current_tile = player_position.to_tile();
-        // println!("X: {} Y: {}", current_tile.tx ,current_tile.ty);
+
+        // Determine if pellets collected
         let mut newly_pellet_emptied = false;
         let mut newly_power_pellet_emptied = false;
         newly_pellet_emptied |= self.collect_pellet(&current_tile);
         newly_power_pellet_emptied |= self.collect_power_pellet(&current_tile);
+
+        // Increaee score if pellets collected
         if newly_pellet_emptied {
             score_change.pellets_collected += 1;
         } else if newly_power_pellet_emptied {
             score_change.power_pellets_collected +=1;
         }
+
         if score_change.happened() {
             // Don't forget this location should still be in history:
             let current = *player_history.front().unwrap();
@@ -637,73 +603,7 @@ impl Board {
         }
         score_change
     }
-    // This function takes in the players history to determine a board update
-    // fn check_pellets(&mut self, player_history: &mut VecDeque<u32>) -> BoardUpdate {
-        // Init a BoardUpdate to represent the score_change
-    //     let mut score_change = BoardUpdate::new();
-    //     // Iterate through player history and collect pellets
-    //     if let Some(end) = player_history.front() {
-    //         // // Is still updating only every junctions
-    //         // let current_tile = self.lookup_position(*end);
-    //         // // println!("X: {} Y: {}",current_tile.tx, current_tile.ty);
-    //         // let mut newly_pellet_emptied = false;
-    //         // let mut newly_power_pellet_emptied = false;
-    //         // newly_pellet_emptied |= self.collect_pellet(&current_tile);
-    //         // newly_power_pellet_emptied |= self.collect_power_pellet(&current_tile);
-    //         // if newly_pellet_emptied {
-    //         //     score_change.pellets_collected += 1;
-    //         // } else if newly_power_pellet_emptied {
-    //         //     score_change.power_pellets_collected +=1;
-    //         // }
 
-    //         if let Some(start) = player_history.iter().find(|j| *j != end) {
-    //             // iterate from start..end and paint()
-    //             let t1 = self.lookup_position(*start);//create tilepoints
-    //             let t2 = self.lookup_position(*end);
-    //             let dx = (t2.tx - t1.tx).signum();
-    //             let dy = (t2.ty - t1.ty).signum();
-    //             // debug_assert!(dx.abs() + dy.abs() == 1);
-
-    //             // determine if any pellets were collected
-    //             let mut newly_pellet_emptied = false;
-    //             let mut newly_power_pellet_emptied = false;
-    //             newly_pellet_emptied |= self.collect_pellet(&t1);
-    //             newly_power_pellet_emptied |= self.collect_power_pellet(&t1);
-    //             let mut t = t1.clone();
-    //             // move from beginning of history to end 
-    //             while t != t2 {
-    //                 t = t.translate(dx, dy);
-    //                 newly_pellet_emptied |= self.collect_pellet(&t);
-    //                 newly_power_pellet_emptied |= self.collect_power_pellet(&t);
-    //             }
-    //             if newly_pellet_emptied {
-    //                 // if dy.abs() > 0 {
-    //                 //     score_change.pellets_collected += (t2.ty - t1.ty).abs();
-    //                 // } else {
-    //                 //     score_change.pellets_collected += (t2.tx - t1.tx).abs();
-    //                 // }
-    //                 score_change.junctions = Some((*start, *end));
-    //             }
-    //             if newly_power_pellet_emptied {
-    //                 // if dy.abs() > 0 {
-    //                 //     score_change.power_pellets_collected += (t2.ty - t1.ty).abs();
-    //                 // } else {
-    //                 //     score_change.power_pellets_collected += (t2.tx - t1.tx).abs();
-    //                 // }
-    //                 score_change.junctions = Some((*start, *end));
-    //             }
-    //         }
-    //     }
-
-    //     if score_change.happened() {
-    //         // Don't forget this location should still be in history:
-    //         let current = *player_history.front().unwrap();
-    //         player_history.clear();
-    //         player_history.push_front(current);
-    //     }
-
-    //     score_change
-    // }
     // Change value of Tile to Empty if it was a Pellet
     pub fn collect_pellet(&mut self, tile: &TilePoint) -> bool {
         let val = &mut self.tiles[tile.ty as usize][tile.tx as usize];
@@ -761,9 +661,9 @@ impl Board {
     }
 }
 
-// implementation of the state type 
+// State 
 impl State {
-    // return a state or an error 
+    // Return a new state
     pub fn try_new(config: &Pacman) -> Result<State, String> {
         let board = Board::try_new(&config.board)?;
         let mut config = config.clone();
@@ -792,30 +692,31 @@ impl State {
             config,
             state: core,
         };
+        state.set_immobility();
         state.reset(true);
         Ok(state)
     }
-    // reset the state
+    // Set immobility of mobs at the beginning of a level 
+    pub fn set_immobility(&mut self){
+        let mut id = 0;
+        for e in self.state.enemies.iter_mut(){
+            e.immobilized_timer = id * self.config.start_immobilized_base; 
+            id +=1;
+        }
+    }
+
+    // Reset the state
     pub fn reset(&mut self, player_death: bool) {
         self.state
             .player
             .reset(&self.config.player_start, &self.state.board);
-        // On the default board, we imagine starting from below the initial place.
-        // This way going up paints the first segment.
-        // if self.config.default_board_bugs {
-        //     self.state.player.history.push_front(
-        //         self.state
-        //             .board
-        //             .get_junction_id(&TilePoint::new(31, 18))
-        //             .unwrap(),
-        //     );
-        // }
-
-        // commenting this out will make ghosts not reset upon catching pacman
+        
+        // If the reset is due to player death then don't reset the enemies 
         if !player_death{
             for enemy in &mut self.state.enemies {
                 enemy.reset(&self.config.player_start, &self.state.board);
             }
+            self.set_immobility();
         }
     }
     pub fn board_size(&self) -> WorldPoint {
@@ -823,21 +724,10 @@ impl State {
         let tw = self.state.board.width as i32;
         TilePoint::new(tw + 1, th + 1).to_world()
     }
-    /// Determine whether an enemy and a player are colliding and what to do about it.
-    /// returns: (player_dead, enemy_caught)
+    // Determine whether an enemy and a player are colliding and what to do about it.
     fn check_enemy_player_collision(&self, enemy: &Mob, enemy_id: usize) -> EnemyPlayerState {
         if self.state.player.position.to_tile() == enemy.position.to_tile() {
-            // If ghosts are vulnerable, then player is not killed and ghost are 
-            // if self.state.vulnerability_timer > 0 {
-            //     if !enemy.caught {
-            //         EnemyPlayerState::EnemyCatch(enemy_id)
-            //     } else {
-            //         EnemyPlayerState::Miss
-            //     }
-            //     // EnemyPlayerState::Miss
-            // } else {
-            //     EnemyPlayerState::PlayerDeath
-            // }
+            // If the enemy is vulnerble then player catches it, otherwise the the player dies
             if enemy.vulnerable {
                 EnemyPlayerState::EnemyCatch(enemy_id)
             } else {
@@ -849,18 +739,14 @@ impl State {
             EnemyPlayerState::Miss
         }
     }
-    // If player/enemy is on a teleport block, teleport player to corresponding position 
-    // by updating position
+    // Determine if the Mob is on a teleport block
     fn check_teleport(&self, mob: &Mob) -> bool {
-        // Get player position
         let current_tile = mob.position.to_tile();
         if self.state.board.is_tp(&current_tile) {
             true
         } else {
             false
         }
-        // Check if player position 
-        // board.is_tp() accepts a tilepoint and returns bool
     }
 }
 
@@ -949,13 +835,11 @@ where
             &mut self.state.rand,
         ) {
             // Update score for pellets collected
-            let mut allow_score_change = true;
-            if allow_score_change {
-                self.state.score += score_change.pellets_collected * self.config.score_increase_per_pellet;
-                // Power pellets offer 
-                self.state.score += score_change.power_pellets_collected * self.config.score_increase_per_power_pellet;
-            }
-            // If a power pellet is collected then ghosts will become vulnerable and timer will start
+            
+            self.state.score += score_change.pellets_collected * self.config.score_increase_per_pellet;
+            self.state.score += score_change.power_pellets_collected * self.config.score_increase_per_power_pellet;
+            
+            // If a power pellet is collected then ghosts will become vulnerable and a timer will start
             if score_change.power_pellets_collected > 0 {
                 self.state.vulnerability_timer = self.config.vulnerable_time;
                 // Collecting a power pellet will reset enemies caught multipler to 0
@@ -993,16 +877,25 @@ where
             }
             
         }
-        // Check if enemies should move slower: Will move slower than Pamcan if vulnerable
+        // Check if enemies should move slower: Will move slower than Pamcan if vulnerable or immobilized
         for e in self.state.enemies.iter_mut(){
-            if e.vulnerable{
-                e.change_speed(self.config.enemy_starting_speed-4);
+            // If immbolized, should move slower
+            if e.immobilized_timer > 0 {
+                e.change_speed(0);
             } else {
-                e.change_speed(self.config.enemy_starting_speed);
+                // If vulnerable should move slower
+                if e.vulnerable{
+                    e.change_speed(self.config.enemy_starting_speed - 5);
+                } else {
+                    e.change_speed(self.config.enemy_starting_speed);
+                }
+            }
+            // Decrement immbolized timer if active
+            if e.immobilized_timer > 0{
+                e.immobilized_timer -=1; 
             }
         }
-      
-     
+
         // Move enemies:
         for e in self.state.enemies.iter_mut() {
             e.update(
@@ -1038,8 +931,7 @@ where
         // Process EnemyPlayerState that were interesting!
 
         // Vector to make sure if an enemy is being evaluated twice
-        // let mut caught_vev: Vec<usize> = Vec::new(); 
-        let mut recently_caught = 5; 
+        let mut caught_vec: Vec<usize> = Vec::new(); 
         for change in changes {
             match change {
                 EnemyPlayerState::Miss => {
@@ -1050,33 +942,17 @@ where
                     break;
                 }
                 EnemyPlayerState::EnemyCatch(eid) => {
-                    // if caught_vev.iter().any(|&i| i != eid){
-                    if recently_caught != eid {
-                        recently_caught = eid;
-                        // caught_vev.push(eid);
-                        println!("Ran. ID: {}", eid);
+                    // Sometimes a collison will be registered twice so this stops that 
+                    if !caught_vec.iter().any(|&i| i == eid){
+                        caught_vec.push(eid);
                         // Increase score 
-                        self.state.score += (self.config.score_increase_base_per_ghost_catch * self.state.enemies_caught_multiplier);
+                        self.state.score += self.config.score_increase_base_per_ghost_catch * self.state.enemies_caught_multiplier;
                         // Double catch multiplier
                         self.state.enemies_caught_multiplier *=2;
                         // Reset enemy, which will reset vulnerbability and position
                         self.state.enemies[eid].reset(&self.config.player_start, &self.state.board);
+                        self.state.enemies[eid].immobilized_timer = self.config.immobilized_time;
                     }
-                    // If enemy was just caught
-                    // if !self.state.enemies[eid].caught {
-                    //     // If player collects multiple ghosts per power pellet, score is multiplied
-                    //     // println!("Multiplier: {}", self.state.enemies_caught_multiplier );
-                    //     // self.state.score += (self.config.score_increase_base_per_ghost_catch * self.state.enemies_caught_multiplier);
-                    //     // self.state.enemies_caught_multiplier *=2; // increase multiplier with every ghost caught (reset when vlnerability reset)
-                    //     println!("Ran");
-                    //     self.state.enemies[eid].caught = true;
-                    //     self.state.enemies[eid].vulnerable = false;
-                    // }
-                    // if self.state.enemies[eid].caught{
-                    //     self.state.enemies[eid].reset(&self.config.player_start, &self.state.board);
-                    //     self.state.enemies[eid].caught = false; 
-                        
-                    // }
                 }
             }
         }
@@ -1106,7 +982,7 @@ where
     // This is where we draw out the board
     fn draw(&self) -> Vec<Drawable> {
         // Current time to be used in flashing animations 
-        let mut current_time = 0; 
+        let current_time; 
         match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
             Ok(n) => current_time = n.as_millis(),
             Err(_) => panic!("SystemTime Error"),
@@ -1119,16 +995,12 @@ where
 
         let (tile_w, tile_h) = screen::TILE_SIZE;
         let (offset_x, offset_y) = screen::BOARD_OFFSET;
-        // draw the board 
+
+        // Draw the board 
         for (ty, row) in self.state.board.tiles.iter().enumerate() {
             let ty = ty as i32;
             for (tx, tile) in row.iter().enumerate() {
                 let tx = tx as i32;
-
-                // Use the level-1 sprites for odd levels less than the sixth level.
-                // Use the level-2 sprites for even levels and those greater than the sixth level.
-                // We will probably want to put some of this in the config later.
-                // let ghosts = self.state.level % 2 == 1 && self.state.level < 6;
 
                 if self.config.render_images {
                     let mut tile_sprite: &FixedSpriteData = match tile {
@@ -1171,15 +1043,15 @@ where
         let (player_x, player_y) = self.state.player.position.to_screen().pixels();
         let (player_w, player_h) = screen::PLAYER_SIZE;
         let mut player_sprite = images::PACMAN_CLOSED.clone();
+
+        // Cycle through pacman animation according to system time in milliseconds
         if current_time % 300 > 200 {
             player_sprite = images::PACMAN_MID.clone();
         } else if current_time % 300 > 100 {
             player_sprite = images::PACMAN_OPEN.clone();
         }
 
-
-        let x = true;
-        if self.config.render_images | x  {
+        if self.config.render_images  {
             output.push(Drawable::sprite(
                 offset_x + player_x - 1,
                 offset_y + player_y - 1,
@@ -1200,14 +1072,10 @@ where
             let (w, h) = screen::ENEMY_SIZE;
 
             if self.config.render_images {
-                // output.push(Drawable::sprite(
-                //     offset_x + x - 1,
-                //     offset_y + y - 1,
-                //     images::GHOST_RED.clone(),
-                // ))
                 output.push(Drawable::sprite(
                     offset_x + x - 1,
                     offset_y + y - 1,
+                    // If enemy vulnerable set to blue. If timer 3/5ths over, ghosts will flash
                     if enemy.vulnerable{
                         if self.state.vulnerability_timer > 200 || self.state.vulnerability_timer % 15 >=7 {
                             images::GHOST_VULNERABLE_BLUE.clone()
@@ -1243,8 +1111,12 @@ where
                     }
                 ));
             } else {
+                let mut color = self.config.enemy_color; 
+                if enemy.vulnerable{
+                    color = self.config.vulnerable_color;
+                }
                 output.push(Drawable::rect(
-                    self.config.enemy_color,
+                    color,
                     offset_x + x - 1,
                     offset_y + y - 1,
                     w,
@@ -1260,18 +1132,21 @@ where
             screen::SCORE_Y_POS + 1,
         ));
         for i in 0..self.state.lives {
-            // output.push(Drawable::rect(
-            //     self.config.player_color,
-            //     screen::LIVES_X_POS - i * screen::LIVES_X_STEP,
-            //     screen::LIVES_Y_POS,
-            //     1,
-            //     DIGIT_HEIGHT + 1,
-            // ))
-            output.push(Drawable::sprite(
-                screen::LIVES_X_POS - i * screen::LIVES_X_STEP,
-                screen::LIVES_Y_POS,
-                images::PACMAN_LARGE.clone(),
-            ))
+            if self.config.render_images {
+                output.push(Drawable::sprite(
+                    screen::LIVES_X_POS - i * screen::LIVES_X_STEP,
+                    screen::LIVES_Y_POS,
+                    images::PACMAN_LARGE.clone(),
+                ))
+            } else {
+                output.push(Drawable::rect(
+                    self.config.player_color,
+                    screen::LIVES_X_POS - i * screen::LIVES_X_STEP,
+                    screen::LIVES_Y_POS,
+                    1,
+                    DIGIT_HEIGHT + 1,
+                ))
+            }
         }
 
         output
@@ -1310,12 +1185,6 @@ where
                 }
                 serde_json::to_string(&sum)?
             }
-            // "regular_mode" => {
-            //     serde_json::to_string(&(state.chase_timer == 0 && state.jump_timer == 0))?
-            // }
-            // "jump_mode" => serde_json::to_string(&(state.jump_timer > 0))?,
-            // "chase_mode" => serde_json::to_string(&(state.chase_timer > 0))?,
-            // "jumps_remaining" => serde_json::to_string(&(state.jumps > 0))?,
             "num_enemies" => serde_json::to_string(&state.enemies.len())?,
             "enemy_tiles" => {
                 let positions: Vec<(i32, i32)> = state
@@ -1336,9 +1205,9 @@ where
                     Err(QueryError::BadInputArg)?
                 }
             }
-            "enemy_caught" => {
+            "enemy_vulnerable" => {
                 if let Some(index) = args.as_u64() {
-                    let status = state.enemies[index as usize].caught;
+                    let status = state.enemies[index as usize].vulnerable;
                     serde_json::to_string(&status)?
                 } else {
                     Err(QueryError::BadInputArg)?

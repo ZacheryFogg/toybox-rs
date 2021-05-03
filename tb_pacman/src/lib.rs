@@ -7,10 +7,9 @@ extern crate lazy_static;
 extern crate schemars;
 extern crate rand;
 
-// pub mod amidar;
+
 pub mod pacman;
 mod digit_sprites;
-// mod types;
 mod typespacman;
 
 

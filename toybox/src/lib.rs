@@ -22,8 +22,6 @@ pub fn get_simulation_by_name(name: &str) -> Result<Box<dyn Simulation>, String>
         "space_invaders" => Ok(Box::new(space_invaders::SpaceInvaders::default())),
         #[cfg(feature = "pong")]
         "pong" => Ok(Box::new(pong::PongConfig::default())),
-        #[cfg(feature = "pacman")]
-        "pacman" => Ok(Box::new(pacman::Pacman::default())),
         _ => Err(format!(
             "Cannot construct game: `{}`. Try any of {:?}.",
             name, GAME_LIST
