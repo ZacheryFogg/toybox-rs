@@ -12,16 +12,16 @@ use std::time::{SystemTime};
 
 // Module contains basic constants related to GUI
 pub mod screen {
-    pub const GAME_SIZE: (i32, i32) = (147, 160); // Size of GUI window
+    pub const GAME_SIZE: (i32, i32) = (127, 140); // Size of GUI window
     pub const BOARD_OFFSET: (i32, i32) = (0,0); // Game offset from top-left corner of GUI
     pub const PLAYER_SIZE: (i32, i32) = (8, 8); // Size of non-sprite player - GUI size only - not collision boxes
     pub const ENEMY_SIZE: (i32, i32) = (8, 8);
     pub const TILE_SIZE: (i32, i32) = (6, 7); // Size of each tile - GUI and Collision 
-    pub const LIVES_Y_POS: i32 = 130; // Position of sprites on screen 
-    pub const LIVES_X_POS: i32 = 100;
-    pub const LIVES_X_STEP: i32 = 16; 
-    pub const SCORE_Y_POS: i32 = 130;
-    pub const SCORE_X_POS: i32 = LIVES_X_POS - LIVES_X_STEP * 3 - 14;
+    pub const LIVES_Y_POS: i32 = 122; // Position of sprites on screen 
+    pub const LIVES_X_POS: i32 = 110;
+    pub const LIVES_X_STEP: i32 = 10; 
+    pub const SCORE_Y_POS: i32 = 122;
+    pub const SCORE_X_POS: i32 = LIVES_X_POS - LIVES_X_STEP * 3 - 40;
 }
 
 
