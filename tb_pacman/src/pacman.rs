@@ -1,5 +1,5 @@
 use super::digit_sprites::{draw_score, DIGIT_HEIGHT};
-use crate::types::*;
+use crate::typespacman::*;
 use access_json::JSONQuery;
 use serde_json;
 use std::collections::{HashSet, VecDeque};
@@ -8,31 +8,44 @@ use toybox_core::graphics::{Color, Drawable, FixedSpriteData};
 use toybox_core::random;
 use toybox_core::{AleAction, Direction, Input, QueryError};
 use rand::seq::SliceRandom;
+use std::time::{Duration, SystemTime};
+// use std::thread::sleep;
 
 // Module contains basic constants related to GUI
 pub mod screen {
-    pub const GAME_SIZE: (i32, i32) = (250, 250); // Size of GUI window
-    pub const BOARD_OFFSET: (i32, i32) = (15,15); // Game offset from top-left corner of GUI
-    pub const PLAYER_SIZE: (i32, i32) = (7, 7); // Size of non-sprite player - GUI size only - not collision boxes
-    pub const ENEMY_SIZE: (i32, i32) = (7, 7);
-    pub const TILE_SIZE: (i32, i32) = (4, 5); // Size of each tile - GUI and Collision 
-    pub const LIVES_Y_POS: i32 = 198; // Position of lives markers
-    pub const LIVES_X_POS: i32 = 148;
+    pub const GAME_SIZE: (i32, i32) = (147, 160); // Size of GUI window
+    pub const BOARD_OFFSET: (i32, i32) = (0,0); // Game offset from top-left corner of GUI
+    pub const PLAYER_SIZE: (i32, i32) = (8, 8); // Size of non-sprite player - GUI size only - not collision boxes
+    pub const ENEMY_SIZE: (i32, i32) = (8, 8);
+    pub const TILE_SIZE: (i32, i32) = (7, 7); // Size of each tile - GUI and Collision 
+    pub const LIVES_Y_POS: i32 = 130; // Position of lives markers
+    pub const LIVES_X_POS: i32 = 100;
     pub const LIVES_X_STEP: i32 = 16; 
-    pub const SCORE_Y_POS: i32 = 198;
-    pub const SCORE_X_POS: i32 = LIVES_X_POS - LIVES_X_STEP * 3 - 8;
+    pub const SCORE_Y_POS: i32 = 130;
+    pub const SCORE_X_POS: i32 = LIVES_X_POS - LIVES_X_STEP * 3 - 14;
 }
 
 
 // Module contains images for game GUI. Relevant if render_images == True
 pub mod raw_images {
-    pub const PACMAN: &[u8] = include_bytes!("resources/pacman/ .png");
-    pub const GHOST_RED: &[u8] = include_bytes!("resources/pacman/ .png");
-    pub const GHOST_PINK: &[u8] = include_bytes!("resources/pacman/ .png");
-    pub const GHOST_GREEN: &[u8] = include_bytes!("resources/pacman/ .png");
-    pub const GHOST_YELLOW: &[u8] = include_bytes!("resources/pacman/ .png");
-    pub const GHOST_VULNERABLE: &[u8] = include_bytes!("resources/pacman/ .png");
-    pub const GHOST_FLASHING: &[u8] = include_bytes!("resources/pacman/ .png");
+    pub const PACMAN_MID: &[u8] = include_bytes!("resources/pacman/pacmanMid.png");
+    pub const PACMAN_CLOSED: &[u8] = include_bytes!("resources/pacman/pacmanClosed.png");
+    pub const PACMAN_OPEN: &[u8] = include_bytes!("resources/pacman/pacmanOpen.png");
+    pub const PACMAN_LARGE: &[u8] = include_bytes!("resources/pacman/pacmanLarge.png");
+    pub const GHOST_RED1: &[u8] = include_bytes!("resources/pacman/ghostRed1.png");
+    pub const GHOST_RED2: &[u8] = include_bytes!("resources/pacman/ghostRed2.png");
+    pub const GHOST_PINK1: &[u8] = include_bytes!("resources/pacman/ghostPink1.png");
+    pub const GHOST_PINK2: &[u8] = include_bytes!("resources/pacman/ghostPink2.png");
+    pub const GHOST_GREEN1: &[u8] = include_bytes!("resources/pacman/ghostGreen1.png");
+    pub const GHOST_GREEN2: &[u8] = include_bytes!("resources/pacman/ghostGreen2.png");
+    pub const GHOST_YELLOW1: &[u8] = include_bytes!("resources/pacman/ghostYellow1.png");
+    pub const GHOST_YELLOW2: &[u8] = include_bytes!("resources/pacman/ghostYellow2.png");
+    pub const GHOST_VULNERABLE_WHITE: &[u8] = include_bytes!("resources/pacman/ghostVulnerableWhite.png");
+    pub const GHOST_VULNERABLE_BLUE: &[u8] = include_bytes!("resources/pacman/ghostVulnerableBlue.png");
+    pub const TILE_WITH_PELLET: &[u8] = include_bytes!("resources/pacman/tileWithPellet.png");
+    pub const TILE_WITH_POWER_PELLET: &[u8] = include_bytes!("resources/pacman/tileWithPowerPellet.png");
+    pub const TILE_EMPTY: &[u8] = include_bytes!("resources/pacman/tileEmpty.png");
+    pub const TILE_WALL: &[u8] = include_bytes!("resources/pacman/tileWall.png");
 }
 
 
@@ -40,21 +53,32 @@ pub mod raw_images {
 pub mod images {
     use super::*;
     lazy_static! { //lazy_static to allow other variables to be loaded
-        pub static ref PACMAN: FixedSpriteData = FixedSpriteData::load_png(raw_images::PACMAN);
-        pub static ref GHOST_RED: FixedSpriteData = FixedSpriteData::load_png(raw_images::GHOST_RED);
-        pub static ref GHOST_PINK: FixedSpriteData = FixedSpriteData::load_png(raw_images::GHOST_PINK);
-        pub static ref GHOST_GREEN: FixedSpriteData = FixedSpriteData::load_png(raw_images::GHOST_GREEN);
-        pub static ref GHOST_YELLOW: FixedSpriteData = FixedSpriteData::load_png(raw_images::GHOST_YELLOW);
-        pub static ref GHOST_VULNERABLE: FixedSpriteData = FixedSpriteData::load_png(raw_images::GHOST_VULNERABLE);
-        pub static ref GHOST_FLASHING: FixedSpriteData = FixedSpriteData::load_png(raw_images::GHOST_FLASHING);
+        pub static ref PACMAN_MID: FixedSpriteData = FixedSpriteData::load_png(raw_images::PACMAN_MID);
+        pub static ref PACMAN_CLOSED: FixedSpriteData = FixedSpriteData::load_png(raw_images::PACMAN_CLOSED);
+        pub static ref PACMAN_OPEN: FixedSpriteData = FixedSpriteData::load_png(raw_images::PACMAN_OPEN);
+        pub static ref PACMAN_LARGE: FixedSpriteData = FixedSpriteData::load_png(raw_images::PACMAN_LARGE);
+        pub static ref GHOST_RED1: FixedSpriteData = FixedSpriteData::load_png(raw_images::GHOST_RED1);
+        pub static ref GHOST_RED2: FixedSpriteData = FixedSpriteData::load_png(raw_images::GHOST_RED2);
+        pub static ref GHOST_PINK1: FixedSpriteData = FixedSpriteData::load_png(raw_images::GHOST_PINK1);
+        pub static ref GHOST_PINK2: FixedSpriteData = FixedSpriteData::load_png(raw_images::GHOST_PINK2);
+        pub static ref GHOST_GREEN1: FixedSpriteData = FixedSpriteData::load_png(raw_images::GHOST_GREEN1);
+        pub static ref GHOST_GREEN2: FixedSpriteData = FixedSpriteData::load_png(raw_images::GHOST_GREEN2);
+        pub static ref GHOST_YELLOW1: FixedSpriteData = FixedSpriteData::load_png(raw_images::GHOST_YELLOW1);
+        pub static ref GHOST_YELLOW2: FixedSpriteData = FixedSpriteData::load_png(raw_images::GHOST_YELLOW2);
+        pub static ref GHOST_VULNERABLE_WHITE: FixedSpriteData = FixedSpriteData::load_png(raw_images::GHOST_VULNERABLE_WHITE);
+        pub static ref GHOST_VULNERABLE_BLUE: FixedSpriteData = FixedSpriteData::load_png(raw_images::GHOST_VULNERABLE_BLUE);
+        pub static ref TILE_WITH_PELLET: FixedSpriteData = FixedSpriteData::load_png(raw_images::TILE_WITH_PELLET);
+        pub static ref TILE_WITH_POWER_PELLET: FixedSpriteData = FixedSpriteData::load_png(raw_images::TILE_WITH_POWER_PELLET);
+        pub static ref TILE_EMPTY: FixedSpriteData = FixedSpriteData::load_png(raw_images::TILE_EMPTY);
+        pub static ref TILE_WALL: FixedSpriteData = FixedSpriteData::load_png(raw_images::TILE_WALL);
     }
 }
 
 
 // Module creates variables related to World (world is internal, while screen in GUI)
 mod world {
-    use super::screen; // Import variable from screen module
-    pub const SCALE: i32 = 16;
+    use super::screen; 
+    pub const SCALE: i32 = 32;
     pub const TILE_SIZE: (i32, i32) = (screen::TILE_SIZE.0 * SCALE, screen::TILE_SIZE.1 * SCALE);
 }
 
@@ -65,14 +89,13 @@ pub const PACMAN_BOARD: &str = include_str!("resources/pacman_default_board");
 
 // Module intiates speed of mobs 
 mod inits {
-    pub const ENEMY_STARTING_SPEED: i32 = 10;
-    pub const PLAYER_SPEED: i32 = 8;
+    pub const ENEMY_STARTING_SPEED: i32 = 18;
+    pub const PLAYER_SPEED: i32 = 30;
 }
 
 
 // Implement Pacman type
 impl Pacman {
-    // Using internal variables, return a vector color addresses
     pub fn colors(&self) -> Vec<&Color> {
         vec![
             &self.bg_color,
@@ -87,25 +110,33 @@ impl Pacman {
 impl Default for Pacman {
     fn default() -> Self {
         Pacman {
-            rand: random::Gen::new_from_seed(13)
-            board: PACMAN_BOARD.lines().map(|s| s.to_owned()).collect(), // Vec<String> 
-            player_start: TilePoint::new(12, 15), //Start Tile of Player
-            bg_color: Color::rgb(31, 41, 148),
-            fg_color: Color::rgb(242, 124, 124),
-            pellet_color: Color:rgb(252, 186, 3),
+            rand: random::Gen::new_from_seed(13),
+            board: PACMAN_BOARD.lines().map(|s| s.to_owned()).collect(),
+            player_start: TilePoint::new(10, 11), 
+            bg_color: Color::rgb(6,21,136),
+            window_color: Color::rgb(0,0,0),
+            fg_color: Color::rgb(232, 107, 115),
+            pellet_color: Color::rgb(252, 186, 3),
             power_pellet_color: Color::rgb(245, 129, 66),
             teleport_color: Color::rgb(200, 66, 245),
-            player_color: Color::rgb(245, 233, 66),
+            player_color: Color::rgb(197,187,88),
             enemy_color: Color::rgb(255,0,0),
+            vulnerable_color: Color::rgb(76, 108, 206),
             start_lives: 3,
-            render_images: false,
+            history_limit: 12,
+            render_images: true,
             enemy_starting_speed: inits::ENEMY_STARTING_SPEED,
+            life_gain_threshold: 10000,
+            score_increase_per_pellet: 10,
+            score_increase_per_power_pellet: 50,
+            score_increase_base_per_ghost_catch: 200,
             player_speed: inits::PLAYER_SPEED,
-            vulnerable_time: 300
-            enemies: vec![MovementAI::EnemyRandomMvmt,  //4 random agents for now
-                          MovementAI::EnemyRandomMvmt,
-                          MovementAI::EnemyRandomMvmt,
-                          MovementAI::EnemyRandomMvmt]
+            vulnerable_time: 500, // 10 seconds
+            // 4 random agents for now
+            enemies: vec![MovementAI::EnemyRandomMvmt {start: TilePoint::new(10, 6), start_dir: Direction::Up, dir: Direction::Up,},
+                          MovementAI::EnemyRandomMvmt {start: TilePoint::new(10, 6), start_dir: Direction::Up, dir: Direction::Up,},
+                          MovementAI::EnemyRandomMvmt {start: TilePoint::new(10, 6), start_dir: Direction::Up, dir: Direction::Up,},
+                          MovementAI::EnemyRandomMvmt {start: TilePoint::new(10, 6), start_dir: Direction::Up, dir: Direction::Up,}]   
         }
     }
 }
@@ -175,45 +206,6 @@ impl TilePoint {
     }
 }
 
-// Implement GridBox type: represents boxes/tile on the board
-// impl GridBox {
-//     /// 
-//     fn new(top_left: TilePoint, bottom_right: TilePoint, pellet: bool, power_pellet: bool) -> GridBox {
-//         GridBox {
-//             top_left,
-//             bottom_right,
-//             pellet, 
-//             power_pellet,
-//         }
-//     }
-//     // Check if TilePoint is in GridBox 
-//     fn matches(&self, tile: &TilePoint) -> bool {
-//         let x1 = self.top_left.tx;
-//         let x2 = self.bottom_right.tx;
-//         let y1 = self.top_left.ty;
-//         let y2 = self.bottom_right.ty;
-
-//         let xq = tile.tx;
-//         let yq = tile.ty;
-
-//         (x1 <= xq) && (xq <= x2) && (y1 <= yq) && (yq <= y2)
-//     }
-//     // Check whether or not this gridbox should be updated: pellet collected
-//     fn should_update_paint(&self, board: &Board) -> bool {
-//         if self.pellet == false && self.power_pellet == false{ // If empty then no update required
-//             return false;
-//         }
-
-//         let x1 = self.top_left.tx;
-//         let x2 = self.bottom_right.tx;
-//         let y1 = self.top_left.ty;
-//         let y2 = self.bottom_right.ty;
-
-//         // Determine using board if pellet was collected
-//         false
-//     }
-// }
-
 // Implement Tile type: 
 impl Tile {
     fn new_from_char(c: char) -> Result<Tile, String> {
@@ -223,9 +215,8 @@ impl Tile {
             '=' => Ok(Tile::Pellet), // Empty + pellet
             'p' => Ok(Tile::PowerPellet), // Empty + power pellet
             '#' => Ok(Tile::Wall), // Non movelable area 
-            'h' => Ok(Tile:House), // Enemies home
-            'l' => Ok(Tile:LeftTeleport),
-            'r' => Ok(Tile:RightTeleport),
+            'h' => Ok(Tile::House), // Enemies home
+            't' => Ok(Tile::Teleport),
             _ => Err(format!("Cannot construct AmidarTile from '{}'", c)),
         }
     }
@@ -233,15 +224,15 @@ impl Tile {
     pub fn walkable(self) -> bool {
         match self{
             Tile::House | Tile::Wall => false,
-            Tile::Pellet | Tile::PowerPellet | Tile::Empty | Tile::LeftTeleport | Tile::RightTeleport => true,
+            Tile::Pellet | Tile::PowerPellet | Tile::Empty | Tile::Teleport => true,
         }
     }
 
     // Tile contains a pellet or power pellet 
-    pub fn is_stil_collectable(self) -> bool {
+    pub fn is_still_collectable(self) -> bool {
         match self {
             Tile::Pellet | Tile::PowerPellet => true,
-            Tile::Empty | Tile::Wall | Tile::House | Tile::LeftTeleport | Tile::RightTeleport => false,
+            Tile::Empty | Tile::Wall | Tile::House | Tile::Teleport => false,
         }
     }
 }
@@ -351,6 +342,21 @@ impl Mob {
     fn change_speed(&mut self, new_speed: i32) {
         self.speed = new_speed;
     }
+    fn teleport(&mut self, board: &Board) {
+        self.step = None; 
+        let mut new_x = 0;
+        if self.position.to_tile().tx == 0 {
+            new_x = 19;
+        } else {
+            new_x = 1;
+        }
+        self.position = TilePoint::new(new_x, self.position.to_tile().ty).to_world();
+        // self.position = match self.ai {
+        //     MovementAI::Player => new_position,
+        //     MovementAI::EnemyRandomMvmt { ref start, .. } => start.clone().to_world(),
+        // }
+
+    }
     // reset agent in world to it's start
     fn reset(&mut self, player_start: &TilePoint, board: &Board) {
         self.step = None;
@@ -360,6 +366,8 @@ impl Mob {
             MovementAI::EnemyRandomMvmt { ref start, .. } => start.clone().to_world(),
         };
         self.history.clear();
+        self.caught = false;
+        self.vulnerable = false;
     }
     // return an optional board update 
     pub fn update(
@@ -415,12 +423,17 @@ impl Mob {
                 self.ai
                     .choose_next_tile(&self.position.to_tile(), buttons, board, player, rng)
         }
+        if self.is_player(){
 
+            board.check_pellets_every_tile(&mut self.position,&mut self.history).into_option()
+        }
         // Manage history:
-        if self.is_player() {
-            // Check if based on player history any pellets were collected
-            board.check_pellets(&mut self.history).into_option()
-        } else {
+        // if self.is_player() {
+        //     // Check if based on player history any pellets were collected
+        //     board.check_pellets(&mut self.history).into_option()
+            
+        // } 
+        else {
             // Each moving object in Amidar keeps track of which junctions it has visited. Here, we
             // make sure that datastructure does not grow unbounded with time; limiting it to
             // what is defined in the config.
@@ -451,14 +464,14 @@ impl BoardUpdate {
             pellets_collected: 0,
             power_pellets_collected:0,
             teleport: 0,
-            ghost_consumed: false,
+            ghosts_consumed: 0,
         }
     }//maybe indicates if some significant event happened
     fn happened(&self) -> bool {
         self.junctions.is_some()
             || self.pellets_collected != 0
             || self.power_pellets_collected != 0
-            || self.ghost_consumed != 0
+            || self.ghosts_consumed != 0
             || self.teleport != 0
     }
     // 
@@ -562,24 +575,21 @@ impl Board {
     // fn is_painted(&self, xy: &TilePoint) -> bool {
     //     self.get_tile(xy) == Tile::Painted
     // }
-    fn is_pellet(&self, xy: &TilePoint) -> bool {
-        self.get_tile(xy) == Tile::Pellet
+    // fn is_pellet(&self, xy: &TilePoint) -> bool {
+    //     self.get_tile(xy) == Tile::Pellet
+    // }
+    // fn is_power_pellet(&self, xy: &TilePoint) -> bool {
+    //     self.get_tile(xy) == Tile::PowerPellet
+    // }
+    fn is_tp(&self, xy: &TilePoint) -> bool {
+        self.get_tile(xy) == Tile::Teleport
     }
-    fn is_power_pellet(&self, xy: &TilePoint) -> bool {
-        self.get_tile(xy) == Tile::PowerPellet
-    }
-    fn is_left_tp(&self, xy: &TilePoint) -> bool {
-        self.get_tile(xy) == Tile::LeftTeleport
-    }
-    fn is_right_tp(&self, xy: &TilePoint) -> bool {
-        self.get_tile(xy) == Tile::RightTeleport
-    }
-    fn is_home(&self, xy: &TilePoint) -> bool {
-        self.get_tile(xy) == Tile::Home
-    }
-    fn is_wall(&self, xy: &TilePoint) -> bool {
-        self.get_tile(xy) == Tile::Wall
-    }
+    // fn is_house(&self, xy: &TilePoint) -> bool {
+    //     self.get_tile(xy) == Tile::House
+    // }
+    // fn is_wall(&self, xy: &TilePoint) -> bool {
+    //     self.get_tile(xy) == Tile::Wall
+    // }
 
     // give the tile an id
     fn tile_id(&self, tile: &TilePoint) -> Option<u32> {
@@ -606,62 +616,94 @@ impl Board {
             None
         }
     }
-
-    // This function takes in the players history to determine a board update
-    fn check_pellets(&mut self, player_history: &mut VecDeque<u32>) -> BoardUpdate {
-        // Init a BoardUpdate to represent the score_change
+    fn check_pellets_every_tile(&mut self, player_position: &WorldPoint, player_history: &mut VecDeque<u32>) -> BoardUpdate {
         let mut score_change = BoardUpdate::new();
-        
-        // Iterate through player history and collect pellets
-        if let Some(end) = player_history.front() {
-            if let Some(start) = player_history.iter().find(|j| *j != end) {
-                // iterate from start..end and paint()
-
-                let t1 = self.lookup_position(*start);//create tilepoints
-                let t2 = self.lookup_position(*end);
-                let dx = (t2.tx - t1.tx).signum();
-                let dy = (t2.ty - t1.ty).signum();
-                debug_assert!(dx.abs() + dy.abs() == 1);
-
-                // determine if any pellets were collected
-                let mut newly_emptied = false;
-                newly_pellet_emptied |= self.collect_pellet(&t1)
-                newly_power_pellet_emptied |= self.collect_power_pellet(&t1);
-                let mut t = t1.clone();
-                // move from beginning of history to end 
-                while t != t2 {
-                    t = t.translate(dx, dy);
-                    newly_pellet_emptied |= self.collect_pellet(&t)
-                    newly_power_pellet_emptied |= self.collect_power_pellet(&t);
-                }
-                if newly_pellet_emptied {
-                    if dy.abs() > 0 {
-                        score_change.pellets_collected += (t2.ty - t1.ty).abs();
-                    } else {
-                        score_change.pellets_collected += (t2.tx - t1.tx).abs();
-                    }
-                    score_change.junctions = Some((*start, *end));
-                }
-                if newly_power_pellet_emptied {
-                    if dy.abs() > 0 {
-                        score_change.power_pellets_collected += (t2.ty - t1.ty).abs();
-                    } else {
-                        score_change.power_pellets_collected += (t2.tx - t1.tx).abs();
-                    }
-                    score_change.junctions = Some((*start, *end));
-                }
-            }
+        let current_tile = player_position.to_tile();
+        // println!("X: {} Y: {}", current_tile.tx ,current_tile.ty);
+        let mut newly_pellet_emptied = false;
+        let mut newly_power_pellet_emptied = false;
+        newly_pellet_emptied |= self.collect_pellet(&current_tile);
+        newly_power_pellet_emptied |= self.collect_power_pellet(&current_tile);
+        if newly_pellet_emptied {
+            score_change.pellets_collected += 1;
+        } else if newly_power_pellet_emptied {
+            score_change.power_pellets_collected +=1;
         }
-
         if score_change.happened() {
             // Don't forget this location should still be in history:
             let current = *player_history.front().unwrap();
             player_history.clear();
             player_history.push_front(current);
         }
-
         score_change
     }
+    // This function takes in the players history to determine a board update
+    // fn check_pellets(&mut self, player_history: &mut VecDeque<u32>) -> BoardUpdate {
+        // Init a BoardUpdate to represent the score_change
+    //     let mut score_change = BoardUpdate::new();
+    //     // Iterate through player history and collect pellets
+    //     if let Some(end) = player_history.front() {
+    //         // // Is still updating only every junctions
+    //         // let current_tile = self.lookup_position(*end);
+    //         // // println!("X: {} Y: {}",current_tile.tx, current_tile.ty);
+    //         // let mut newly_pellet_emptied = false;
+    //         // let mut newly_power_pellet_emptied = false;
+    //         // newly_pellet_emptied |= self.collect_pellet(&current_tile);
+    //         // newly_power_pellet_emptied |= self.collect_power_pellet(&current_tile);
+    //         // if newly_pellet_emptied {
+    //         //     score_change.pellets_collected += 1;
+    //         // } else if newly_power_pellet_emptied {
+    //         //     score_change.power_pellets_collected +=1;
+    //         // }
+
+    //         if let Some(start) = player_history.iter().find(|j| *j != end) {
+    //             // iterate from start..end and paint()
+    //             let t1 = self.lookup_position(*start);//create tilepoints
+    //             let t2 = self.lookup_position(*end);
+    //             let dx = (t2.tx - t1.tx).signum();
+    //             let dy = (t2.ty - t1.ty).signum();
+    //             // debug_assert!(dx.abs() + dy.abs() == 1);
+
+    //             // determine if any pellets were collected
+    //             let mut newly_pellet_emptied = false;
+    //             let mut newly_power_pellet_emptied = false;
+    //             newly_pellet_emptied |= self.collect_pellet(&t1);
+    //             newly_power_pellet_emptied |= self.collect_power_pellet(&t1);
+    //             let mut t = t1.clone();
+    //             // move from beginning of history to end 
+    //             while t != t2 {
+    //                 t = t.translate(dx, dy);
+    //                 newly_pellet_emptied |= self.collect_pellet(&t);
+    //                 newly_power_pellet_emptied |= self.collect_power_pellet(&t);
+    //             }
+    //             if newly_pellet_emptied {
+    //                 // if dy.abs() > 0 {
+    //                 //     score_change.pellets_collected += (t2.ty - t1.ty).abs();
+    //                 // } else {
+    //                 //     score_change.pellets_collected += (t2.tx - t1.tx).abs();
+    //                 // }
+    //                 score_change.junctions = Some((*start, *end));
+    //             }
+    //             if newly_power_pellet_emptied {
+    //                 // if dy.abs() > 0 {
+    //                 //     score_change.power_pellets_collected += (t2.ty - t1.ty).abs();
+    //                 // } else {
+    //                 //     score_change.power_pellets_collected += (t2.tx - t1.tx).abs();
+    //                 // }
+    //                 score_change.junctions = Some((*start, *end));
+    //             }
+    //         }
+    //     }
+
+    //     if score_change.happened() {
+    //         // Don't forget this location should still be in history:
+    //         let current = *player_history.front().unwrap();
+    //         player_history.clear();
+    //         player_history.push_front(current);
+    //     }
+
+    //     score_change
+    // }
     // Change value of Tile to Empty if it was a Pellet
     pub fn collect_pellet(&mut self, tile: &TilePoint) -> bool {
         let val = &mut self.tiles[tile.ty as usize][tile.tx as usize];
@@ -669,7 +711,7 @@ impl Board {
         if *val != Tile::Pellet {
             false
         } else {
-            *val = Tile::Empty
+            *val = Tile::Empty;
             true 
         }
 
@@ -681,7 +723,7 @@ impl Board {
         if *val != Tile::PowerPellet {
             false
         } else {
-            *val = Tile::Empty
+            *val = Tile::Empty;
             true 
         }
     }
@@ -710,7 +752,7 @@ impl Board {
     pub fn board_complete(&self) -> bool {
         for row in &self.tiles {
             for tile in row {
-                if tile.is_stil_collectable() {
+                if tile.is_still_collectable() {
                     return false;
                 }
             }
@@ -738,7 +780,8 @@ impl State {
             lives: config.start_lives,
             score: 0,
             vulnerability_timer: 0,
-            enemies_vulenerable: false,
+            enemies_caught_multiplier: 1,
+            lives_gained: 0,
             level: 1,
             player,
             enemies,
@@ -749,26 +792,30 @@ impl State {
             config,
             state: core,
         };
-        state.reset();
+        state.reset(true);
         Ok(state)
     }
     // reset the state
-    pub fn reset(&mut self) {
+    pub fn reset(&mut self, player_death: bool) {
         self.state
             .player
             .reset(&self.config.player_start, &self.state.board);
         // On the default board, we imagine starting from below the initial place.
         // This way going up paints the first segment.
-        if self.config.default_board_bugs {
-            self.state.player.history.push_front(
-                self.state
-                    .board
-                    .get_junction_id(&TilePoint::new(31, 18))
-                    .unwrap(),
-            );
-        }
-        for enemy in &mut self.state.enemies {
-            enemy.reset(&self.config.player_start, &self.state.board);
+        // if self.config.default_board_bugs {
+        //     self.state.player.history.push_front(
+        //         self.state
+        //             .board
+        //             .get_junction_id(&TilePoint::new(31, 18))
+        //             .unwrap(),
+        //     );
+        // }
+
+        // commenting this out will make ghosts not reset upon catching pacman
+        if !player_death{
+            for enemy in &mut self.state.enemies {
+                enemy.reset(&self.config.player_start, &self.state.board);
+            }
         }
     }
     pub fn board_size(&self) -> WorldPoint {
@@ -780,23 +827,40 @@ impl State {
     /// returns: (player_dead, enemy_caught)
     fn check_enemy_player_collision(&self, enemy: &Mob, enemy_id: usize) -> EnemyPlayerState {
         if self.state.player.position.to_tile() == enemy.position.to_tile() {
-            // // If ghosts are vulnerable, then player is not killed and ghost are 
-            // if self.state.chase_timer > 0 {
+            // If ghosts are vulnerable, then player is not killed and ghost are 
+            // if self.state.vulnerability_timer > 0 {
             //     if !enemy.caught {
             //         EnemyPlayerState::EnemyCatch(enemy_id)
             //     } else {
             //         EnemyPlayerState::Miss
             //     }
-            // } else if self.state.jump_timer > 0 {
-            //     EnemyPlayerState::Miss
+            //     // EnemyPlayerState::Miss
             // } else {
             //     EnemyPlayerState::PlayerDeath
             // }
-            EnemyPlayerState::PlayerDeath
+            if enemy.vulnerable {
+                EnemyPlayerState::EnemyCatch(enemy_id)
+            } else {
+                EnemyPlayerState::PlayerDeath
+            // }
+            }
         } else {
             // No overlap.
             EnemyPlayerState::Miss
         }
+    }
+    // If player/enemy is on a teleport block, teleport player to corresponding position 
+    // by updating position
+    fn check_teleport(&self, mob: &Mob) -> bool {
+        // Get player position
+        let current_tile = mob.position.to_tile();
+        if self.state.board.is_tp(&current_tile) {
+            true
+        } else {
+            false
+        }
+        // Check if player position 
+        // board.is_tp() accepts a tilepoint and returns bool
     }
 }
 
@@ -818,15 +882,14 @@ impl toybox_core::Simulation for Pacman {
     fn legal_action_set(&self) -> Vec<AleAction> {
         let mut actions = vec![
             AleAction::NOOP,
-            AleAction::FIRE,
             AleAction::UP,
             AleAction::RIGHT,
             AleAction::LEFT,
             AleAction::DOWN,
-            AleAction::UPFIRE,
-            AleAction::RIGHTFIRE,
-            AleAction::LEFTFIRE,
-            AleAction::DOWNFIRE,
+            AleAction::UPRIGHT,
+            AleAction::UPLEFT,
+            AleAction::DOWNRIGHT,
+            AleAction::DOWNLEFT,
         ];
         actions.sort();
         actions
@@ -878,7 +941,6 @@ where
         let pre_update_score: i32 = self.score();
         let history_limit = self.config.history_limit;
 
-        // Move the player and determine whether the board changes.
         if let Some(score_change) = self.state.player.update(
             buttons,
             &mut self.state.board,
@@ -886,34 +948,62 @@ where
             history_limit,
             &mut self.state.rand,
         ) {
-           
+            // Update score for pellets collected
             let mut allow_score_change = true;
             if allow_score_change {
-                self.state.score += score_change.pellets_collected;
-                // max 1 point for vertical, for some reason.
-                self.state.score += score_change.power_pellets_collected;
+                self.state.score += score_change.pellets_collected * self.config.score_increase_per_pellet;
+                // Power pellets offer 
+                self.state.score += score_change.power_pellets_collected * self.config.score_increase_per_power_pellet;
             }
-
+            // If a power pellet is collected then ghosts will become vulnerable and timer will start
             if score_change.power_pellets_collected > 0 {
                 self.state.vulnerability_timer = self.config.vulnerable_time;
+                // Collecting a power pellet will reset enemies caught multipler to 0
+                self.state.enemies_caught_multiplier = 1;
+                for e in self.state.enemies.iter_mut(){
+                    e.vulnerable = true;
+                }
+            }
+        }
+        // If the timer is 0, then reset vulnerability of enemies back to false
+        if self.state.vulnerability_timer == 0 {
+            for e in self.state.enemies.iter_mut(){
+                e.vulnerable = false;
             }
         }
 
+        // Check if the player should be teleported
+        let result = self.check_teleport(&self.state.player);
+        if result {
+            self.state.player.teleport(&self.state.board)
+        }
+        // Decrement timer if active 
         if self.state.vulnerability_timer > 0 {
             self.state.vulnerability_timer -= 1;
+        }
 
         let mut dead = false;
         let mut changes: Vec<EnemyPlayerState> = Vec::new();
 
-        // check-collisions after player move:
+        // Check-collisions after player move:
         for (i, e) in self.state.enemies.iter().enumerate() {
             let state = self.check_enemy_player_collision(e, i);
             if state != EnemyPlayerState::Miss {
                 changes.push(state);
             }
+            
         }
-
-        // move enemies:
+        // Check if enemies should move slower: Will move slower than Pamcan if vulnerable
+        for e in self.state.enemies.iter_mut(){
+            if e.vulnerable{
+                e.change_speed(self.config.enemy_starting_speed-4);
+            } else {
+                e.change_speed(self.config.enemy_starting_speed);
+            }
+        }
+      
+     
+        // Move enemies:
         for e in self.state.enemies.iter_mut() {
             e.update(
                 Input::default(),
@@ -921,18 +1011,35 @@ where
                 Some(self.state.player.clone()),
                 history_limit,
                 &mut self.state.rand,
-            );
+            );        
         }
-
-        // check-collisions again (so we can't run through enemies):
+        // Check if enemies should be teleported
+        let mut teleport_vec: Vec<usize> =  Vec::new();
+        // Check-collisions again (so we can't run through enemies):
         for (i, e) in self.state.enemies.iter().enumerate() {
             let state = self.check_enemy_player_collision(e, i);
             if state != EnemyPlayerState::Miss {
                 changes.push(state);
             }
+            let result = self.check_teleport(e);
+            if result{
+                teleport_vec.push(i);
+            }
+        }
+        // Teleport enemies if any should be
+        let mut eid = 0; // index of enemy 
+        for e in self.state.enemies.iter_mut(){
+            if teleport_vec.iter().any(|&i| i == eid ) {
+                e.teleport(&mut self.state.board);
+            }
+            eid +=1;
         }
 
         // Process EnemyPlayerState that were interesting!
+
+        // Vector to make sure if an enemy is being evaluated twice
+        // let mut caught_vev: Vec<usize> = Vec::new(); 
+        let mut recently_caught = 5; 
         for change in changes {
             match change {
                 EnemyPlayerState::Miss => {
@@ -942,61 +1049,70 @@ where
                     dead = true;
                     break;
                 }
-                // EnemyPlayerState::EnemyCatch(eid) => {
-                //     if !self.state.enemies[eid].caught {
-                //         self.state.score += self.config.chase_score_bonus;
-                //         self.state.enemies[eid].caught = true;
-                //     }
-                // }
+                EnemyPlayerState::EnemyCatch(eid) => {
+                    // if caught_vev.iter().any(|&i| i != eid){
+                    if recently_caught != eid {
+                        recently_caught = eid;
+                        // caught_vev.push(eid);
+                        println!("Ran. ID: {}", eid);
+                        // Increase score 
+                        self.state.score += (self.config.score_increase_base_per_ghost_catch * self.state.enemies_caught_multiplier);
+                        // Double catch multiplier
+                        self.state.enemies_caught_multiplier *=2;
+                        // Reset enemy, which will reset vulnerbability and position
+                        self.state.enemies[eid].reset(&self.config.player_start, &self.state.board);
+                    }
+                    // If enemy was just caught
+                    // if !self.state.enemies[eid].caught {
+                    //     // If player collects multiple ghosts per power pellet, score is multiplied
+                    //     // println!("Multiplier: {}", self.state.enemies_caught_multiplier );
+                    //     // self.state.score += (self.config.score_increase_base_per_ghost_catch * self.state.enemies_caught_multiplier);
+                    //     // self.state.enemies_caught_multiplier *=2; // increase multiplier with every ghost caught (reset when vlnerability reset)
+                    //     println!("Ran");
+                    //     self.state.enemies[eid].caught = true;
+                    //     self.state.enemies[eid].vulnerable = false;
+                    // }
+                    // if self.state.enemies[eid].caught{
+                    //     self.state.enemies[eid].reset(&self.config.player_start, &self.state.board);
+                    //     self.state.enemies[eid].caught = false; 
+                        
+                    // }
+                }
             }
         }
-        // If score >= 10,000 increase life by 1 
+        // If Pacman has achieved a multiple of 10k score then increase lived
+        if self.state.score > ((self.state.lives_gained + 1) * self.config.life_gain_threshold) {
+            self.state.lives +=1; 
+            self.state.lives_gained +=1;
+        }
 
         // If dead, reset. If alive, check to see if we have advanced to the next level.
         if dead {
             self.state.lives -= 1;
             self.state.score = pre_update_score;
-            self.reset();
+            self.reset(true);
         } else {
             if self.state.board.board_complete() {
-                self.reset();
+                self.reset(false);
                 // Increment the level
                 self.state.level += 1;
-                // If we triggered the chase counter immediately before
-                // advancing, it will still be on and will mess up the sprites. Reset to 0.
+                // Reset vulnerability to 0 
                 self.state.vulnerability_timer = 0;
-                // Time to paint again!
+                // Reset pellets 
                 self.state.board = Board::fast_new();
-                // If you successfully complete a level, you can get a life back (up the maximum)
-                // if self.lives() < self.config.start_lives {
-                //     self.state.lives += 1;
-                // }
-                // if self.state.level > 2 {
-                //     // Starting at level 3, there are six enemies.
-                //     // We haven't observed an agent that can get to level 3 and can't find any description
-                //     // of what level 3 looks like, so we are leaving this blank for now.
-                // }
-                // Increase enemy speed.
-                // Make pretty later
-                // let new_speed = {
-                //     if self.state.level < 3 {
-                //         self.config.enemy_starting_speed
-                //     } else if self.state.level < 5 {
-                //         self.config.enemy_starting_speed + 2
-                //     } else {
-                //         self.config.enemy_starting_speed + 4
-                //     }
-                // };
-                // for e in &mut self.state.enemies {
-                //     e.change_speed(new_speed);
-                // }
             }
         }
     }
     // This is where we draw out the board
     fn draw(&self) -> Vec<Drawable> {
+        // Current time to be used in flashing animations 
+        let mut current_time = 0; 
+        match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
+            Ok(n) => current_time = n.as_millis(),
+            Err(_) => panic!("SystemTime Error"),
+        }
         let mut output = Vec::new();
-        output.push(Drawable::Clear(self.config.bg_color));
+        output.push(Drawable::Clear(self.config.window_color));
         if self.state.lives < 0 {
             return output;
         }
@@ -1012,38 +1128,34 @@ where
                 // Use the level-1 sprites for odd levels less than the sixth level.
                 // Use the level-2 sprites for even levels and those greater than the sixth level.
                 // We will probably want to put some of this in the config later.
-                let ghosts = self.state.level % 2 == 1 && self.state.level < 6;
+                // let ghosts = self.state.level % 2 == 1 && self.state.level < 6;
 
                 if self.config.render_images {
-                    // let tile_sprite: &FixedSpriteData = match tile {
-                    //     &Tile::Painted => {
-                    //         if ghosts {
-                    //             &images::BLOCK_TILE_PAINTED_L1
-                    //         } else {
-                    //             &images::BLOCK_TILE_PAINTED_L2
-                    //         }
-                    //     }
-                    //     &Tile::Unpainted | &Tile::ChaseMarker => {
-                    //         if ghosts {
-                    //             &images::BLOCK_TILE_UNPAINTED_L1
-                    //         } else {
-                    //             &images::BLOCK_TILE_UNPAINTED_L2
-                    //         }
-                    //     }
-                    //     &Tile::Empty => continue,
-                    // };
-                    // output.push(Drawable::sprite(
-                    //     offset_x + tx * tile_w,
-                    //     offset_y + ty * tile_h,
-                    //     tile_sprite.clone(),
-                    // ));
+                    let mut tile_sprite: &FixedSpriteData = match tile {
+                        &Tile::Pellet=> &images::TILE_WITH_PELLET,
+                        &Tile::PowerPellet=> &images::TILE_WITH_POWER_PELLET,
+                        &Tile::Teleport=> &images::TILE_EMPTY,
+                        &Tile::Wall=> &images::TILE_WALL,
+                        &Tile::House=> &images::TILE_EMPTY,
+                        &Tile::Empty => &images::TILE_EMPTY,
+                    };
+                    if tile == &Tile::PowerPellet {
+                        if current_time % 500 > 250 {
+                            tile_sprite = &images::TILE_EMPTY;
+                        }
+                    }
+                    output.push(Drawable::sprite(
+                        offset_x + tx * tile_w,
+                        offset_y + ty * tile_h,
+                        tile_sprite.clone(),
+                    ));
                 } else {
                     let tile_color = match tile {
                         &Tile::Pellet=> self.config.pellet_color,
                         &Tile::PowerPellet => self.config.power_pellet_color,
-                        &Tile::Wall => self.config.fg_color
-                        &Tile::RightTeleport | &Tile::LeftTeleport => self.config.teleport_color,
-                        &Tile::Empty | &Tile::Home => self.config.bg_color,
+                        &Tile::Wall => self.config.fg_color,
+                        &Tile::Teleport => self.config.teleport_color,
+                        &Tile::Empty | &Tile::House => self.config.bg_color,
                     };
                     output.push(Drawable::rect(
                         tile_color,
@@ -1058,9 +1170,16 @@ where
 
         let (player_x, player_y) = self.state.player.position.to_screen().pixels();
         let (player_w, player_h) = screen::PLAYER_SIZE;
-        let player_sprite = images::PACMAN.clone()
+        let mut player_sprite = images::PACMAN_CLOSED.clone();
+        if current_time % 300 > 200 {
+            player_sprite = images::PACMAN_MID.clone();
+        } else if current_time % 300 > 100 {
+            player_sprite = images::PACMAN_OPEN.clone();
+        }
 
-        if self.config.render_images {
+
+        let x = true;
+        if self.config.render_images | x  {
             output.push(Drawable::sprite(
                 offset_x + player_x - 1,
                 offset_y + player_y - 1,
@@ -1075,58 +1194,64 @@ where
                 player_h,
             ));
         }
-
+        let mut eid = 0; 
         for enemy in &self.state.enemies {
             let (x, y) = enemy.position.to_screen().pixels();
             let (w, h) = screen::ENEMY_SIZE;
-            output.push(Drawable::rect(
-                        self.config.enemy_color,
-                        offset_x + x - 1,
-                        offset_y + y - 1,
-                        w,
-                        h,
-                    ));
-            // if self.config.render_images {
-            //     output.push(Drawable::sprite(
-            //         offset_x + x - 1,
-            //         offset_y + y - 1,
-            //         if self.state.chase_timer > 0 {
-            //             if enemy.caught {
-            //                 match self.state.level % 2 {
-            //                     1 => images::ENEMY_CAUGHT_L1.clone(),
-            //                     0 => images::ENEMY_CAUGHT_L2.clone(),
-            //                     _ => unreachable!(),
-            //                 }
-            //             } else {
-            //                 match self.state.level % 2 {
-            //                     1 => images::ENEMY_CHASE_L1.clone(),
-            //                     0 => images::ENEMY_CHASE_L2.clone(),
-            //                     _ => unreachable!(),
-            //                 }
-            //             }
-            //         } else if self.state.jump_timer > 0 {
-            //             match self.state.level % 2 {
-            //                 1 => images::ENEMY_JUMP_L1.clone(),
-            //                 0 => images::ENEMY_JUMP_L2.clone(),
-            //                 _ => unreachable!(),
-            //             }
-            //         } else {
-            //             match self.state.level % 2 {
-            //                 1 => images::ENEMY_L1.clone(),
-            //                 0 => images::ENEMY_L2.clone(),
-            //                 _ => unreachable!(),
-            //             }
-            //         },
-            //     ))
-            // } else {
-            //     output.push(Drawable::rect(
-            //         self.config.enemy_color,
-            //         offset_x + x - 1,
-            //         offset_y + y - 1,
-            //         w,
-            //         h,
-            //     ));
-            // }
+
+            if self.config.render_images {
+                // output.push(Drawable::sprite(
+                //     offset_x + x - 1,
+                //     offset_y + y - 1,
+                //     images::GHOST_RED.clone(),
+                // ))
+                output.push(Drawable::sprite(
+                    offset_x + x - 1,
+                    offset_y + y - 1,
+                    if enemy.vulnerable{
+                        if self.state.vulnerability_timer > 200 || self.state.vulnerability_timer % 15 >=7 {
+                            images::GHOST_VULNERABLE_BLUE.clone()
+                        } else {
+                            images::GHOST_VULNERABLE_WHITE.clone()
+                        }
+                    } else {
+                        if eid == 0 { 
+                            if current_time % 250 > 125 {
+                                images::GHOST_RED1.clone()
+                            } else {
+                                images::GHOST_RED2.clone()
+                            }
+                        } else if eid == 1 {
+                            if current_time % 250 > 125 {
+                                images::GHOST_GREEN1.clone()
+                            } else {
+                                images::GHOST_GREEN2.clone()
+                            }
+                        } else if eid == 2 {
+                            if current_time % 250 > 125 {
+                                images::GHOST_PINK1.clone()
+                            } else {
+                                images::GHOST_PINK2.clone()
+                            }
+                        } else {
+                            if current_time % 250 > 125 {
+                                images::GHOST_YELLOW1.clone()
+                            } else {
+                                images::GHOST_YELLOW2.clone()
+                            }
+                        }
+                    }
+                ));
+            } else {
+                output.push(Drawable::rect(
+                    self.config.enemy_color,
+                    offset_x + x - 1,
+                    offset_y + y - 1,
+                    w,
+                    h,
+                ));
+            }
+            eid +=1;
         }
 
         output.extend(draw_score(
@@ -1135,12 +1260,17 @@ where
             screen::SCORE_Y_POS + 1,
         ));
         for i in 0..self.state.lives {
-            output.push(Drawable::rect(
-                self.config.player_color,
+            // output.push(Drawable::rect(
+            //     self.config.player_color,
+            //     screen::LIVES_X_POS - i * screen::LIVES_X_STEP,
+            //     screen::LIVES_Y_POS,
+            //     1,
+            //     DIGIT_HEIGHT + 1,
+            // ))
+            output.push(Drawable::sprite(
                 screen::LIVES_X_POS - i * screen::LIVES_X_STEP,
                 screen::LIVES_Y_POS,
-                1,
-                DIGIT_HEIGHT + 1,
+                images::PACMAN_LARGE.clone(),
             ))
         }
 
@@ -1170,22 +1300,22 @@ where
                 let world = tile_pt.to_world();
                 serde_json::to_string(&(world.x, world.y))?
             }
-            "num_tiles_unpainted" => {
+            "num_pellets_and_power_pellets_uncollected" => {
                 let mut sum = 0;
                 for row in state.board.tiles.iter() {
                     sum += row
                         .iter()
-                        .filter(|t| t.walkable() && t.needs_paint())
+                        .filter(|t| t.walkable() && t.is_still_collectable())
                         .count();
                 }
                 serde_json::to_string(&sum)?
             }
-            "regular_mode" => {
-                serde_json::to_string(&(state.chase_timer == 0 && state.jump_timer == 0))?
-            }
-            "jump_mode" => serde_json::to_string(&(state.jump_timer > 0))?,
-            "chase_mode" => serde_json::to_string(&(state.chase_timer > 0))?,
-            "jumps_remaining" => serde_json::to_string(&(state.jumps > 0))?,
+            // "regular_mode" => {
+            //     serde_json::to_string(&(state.chase_timer == 0 && state.jump_timer == 0))?
+            // }
+            // "jump_mode" => serde_json::to_string(&(state.jump_timer > 0))?,
+            // "chase_mode" => serde_json::to_string(&(state.chase_timer > 0))?,
+            // "jumps_remaining" => serde_json::to_string(&(state.jumps > 0))?,
             "num_enemies" => serde_json::to_string(&state.enemies.len())?,
             "enemy_tiles" => {
                 let positions: Vec<(i32, i32)> = state

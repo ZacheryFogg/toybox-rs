@@ -70,3 +70,4 @@ Variables I'll need for Pacman struct
 Player moves an entire tile at a time
 
 enemy lookup ai, which im not using, is default planned routes that don't care about board 
+

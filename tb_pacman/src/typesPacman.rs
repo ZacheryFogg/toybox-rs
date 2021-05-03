@@ -10,36 +10,52 @@ use std::collections::{HashSet, VecDeque};
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 
 pub struct Pacman {
-    /// The random number generator that seeds new games.
-    pub rand: random::Gen,
-    /// A representation of the board as a list of strings.
-    pub board: Vec<String>,
-    /// Where does the player start on a new life?
-    pub player_start: TilePoint,
-    /// What is the background color?
-    pub bg_color: Color,
-    /// What color is the foreground(The maze, and pellets)
-    pub fg_color: Color,
-    /// What is the player rectangle color?
-    pub player_color: Color,
-    /// What color are enemies?
-    pub enemy_color: Color,
-    /// How many lives do new games start with?
-    pub start_lives: i32,
-    /// Should we show images/sprites (true) or just colored rectangles (false).
-    pub render_images: bool,
-    /// This should be false if you ever use a non-default board.
-    //  pub default_board_bugs: bool,
-    /// What AIs should we use to spawn enemies on a new game?
-    pub enemies: Vec<MovementAI>,
-    /// How many previous junctions should the player and enemies remember?
-    // pub history_limit: u32,
-    /// How fast do enemies move?
-    pub enemy_starting_speed: i32,
-    /// How fast does the player move?
-    pub player_speed: i32,
-    /// How long are the ghosts vulnerable for 
-    pub vulnerable_time: i32
+     /// The random number generator that seeds new games.
+     pub rand: random::Gen,
+     /// A representation of the board as a list of strings.
+     pub board: Vec<String>,
+     /// Where does the player start on a new life?
+     pub player_start: TilePoint,
+     /// What is the background color?
+     pub bg_color: Color,
+     /// What is the backround of the game window
+     pub window_color: Color,
+     /// What color is the foreground(The maze, and pellets)
+     pub fg_color: Color,
+     /// What is the player rectangle color?
+     pub player_color: Color,
+     /// What is the pellet rectange color
+     pub pellet_color: Color,
+     /// What is the color of a vulnrable ghost
+     pub vulnerable_color: Color,
+     /// What is the color of a power pellet
+     pub power_pellet_color: Color,
+     /// What is the color of a teleport tile
+     pub teleport_color: Color,
+     /// What color are enemies?
+     pub enemy_color: Color,
+     /// How many lives do new games start with?
+     pub start_lives: i32,
+     /// How long does a power pellet make the ghosts vulnerable for
+     pub vulnerable_time: i32,
+     /// Should we show images/sprites (true) or just colored rectangles (false).
+     pub render_images: bool,
+     /// What AIs should we use to spawn enemies on a new game?
+     pub enemies: Vec<MovementAI>,
+     /// How many previous junctions should the player and enemies remember?
+     pub history_limit: u32,
+     /// How fast do enemies move?
+     pub enemy_starting_speed: i32,
+     /// How fast does the player move?
+     pub player_speed: i32,
+     /// How much score is required to gain a life
+     pub life_gain_threshold: i32,
+     /// How much score is gained per pellet 
+     pub score_increase_per_pellet: i32,
+     /// How much score is gained per power pellet 
+     pub score_increase_per_power_pellet: i32,
+     /// What is the base score for catching a ghost
+     pub score_increase_base_per_ghost_catch: i32, 
 }
 
 /// When things are drawn, they are drawn in screen coordinates, i.e., pixels.
@@ -64,35 +80,33 @@ pub struct TilePoint {
 }
 
 /// This represents the boxes on the board, whether or not contains pellets
-// #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
-// pub struct GridBox {
-//     /// Dimension of the GridBox: which tile is its top-left? Specifies location.
-//     pub top_left: TilePoint,
-//     /// Dimension of the GridBox: which tile is its bottom-right? Specifies size implicitly.
-//     pub bottom_right: TilePoint,
-//     /// Does this gridbox contain a pellet 
-//     pub pellet: bool,
-//     /// Does this gridbox contain a power pellet 
-//     pub power_pellet: bool,
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+pub struct GridBox {
+    /// Dimension of the GridBox: which tile is its top-left? Specifies location.
+    pub top_left: TilePoint,
+    /// Dimension of the GridBox: which tile is its bottom-right? Specifies size implicitly.
+    pub bottom_right: TilePoint,
+    /// Does this gridbox contain a pellet 
+    pub pellet: bool,
+    /// Does this gridbox contain a power pellet 
+    pub power_pellet: bool,
     
-// }
+}
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize, JsonSchema)]
 pub enum Tile {
     /// Tiles that are maze walls are treated like walls for collision.
     Wall,
-    /// Walkable tiles that contain a pellet
+    // /// Walkable tiles that contain a pellet
     Pellet,
-    /// Walkable tiles that contain a power pellet.
+    // /// Walkable tiles that contain a power pellet.
     PowerPellet,
     /// Tile that is devoid of any pellet; it may have always been empty or its pellet may have been collected
     Empty,
     /// Tile will teleport Mob to the right corridor
-    LeftTeleport,
-    /// Tile will teleport Mob to the left corridor
-    RightTeleport,
-    /// Tile is walkable by Ghosts but not by player
-    Home,
+    Teleport,
+    /// House,
+    House
 }
 
 /// MovementAI represents Mob (enemy/player) logic for movement.
@@ -109,19 +123,19 @@ pub enum MovementAI {
         /// Which direction am I currently moving?
         dir: Direction,
     },
-    /// Move randomly unless the player is within some fixed Manhattan distance of this enemy -- in that case, move toward the player.
-    EnemyTargetPlayer {
-        /// Where do I start?
-        start: TilePoint,
-        /// Which direction do I explore first?
-        start_dir: Direction,
-        /// How far (Manhattan distance) can I see?
-        vision_distance: i32,
-        /// Which direction am I currently moving?
-        dir: Direction,
-        /// We lock onto a player's position when we see it, so that we can actually be evaded.
-        player_seen: Option<TilePoint>,
-    },
+    // Move randomly unless the player is within some fixed Manhattan distance of this enemy -- in that case, move toward the player.
+    // EnemyTargetPlayer {
+    //     /// Where do I start?
+    //     start: TilePoint,
+    //     /// Which direction do I explore first?
+    //     start_dir: Direction,
+    //     /// How far (Manhattan distance) can I see?
+    //     vision_distance: i32,
+    //     /// Which direction am I currently moving?
+    //     dir: Direction,
+    //     /// We lock onto a player's position when we see it, so that we can actually be evaded.
+    //     player_seen: Option<TilePoint>,
+    // },
 }
 
 /// Mob is a videogame slang for "mobile" unit. Players and Enemies are the same struct.
@@ -131,7 +145,7 @@ pub struct Mob {
     pub ai: MovementAI,
     /// Where is this unit placed (WorldPoint represents sub-pixels!)
     pub position: WorldPoint,
-    /// Have I been caught/eaten?
+    /// Have I been caught recently: this keeps ghosts from being counted as caught multiple times
     pub caught: bool,
     /// Am I vulnerable: Ghosts flash if vulnerbale, Pacman is always vulnerbale unless colliding with a vulnerbale enemy
     pub vulnerable: bool,
@@ -154,11 +168,9 @@ pub struct Board {
     pub height: u32,
     /// Which positions (y*width + x) are junctions? Helps MovementAI and painting game logic!
     pub junctions: HashSet<u32>,
-    /// The list of boxes (inside-portions) of the board.
-    // pub boxes: Vec<GridBox>,
 }
 
-/// This struct is temporarily used inside of the game logic, to ensure purely-functional behavior in certain points. Encodes any changes to the board that could happen in a single update.
+// This struct is temporarily used inside of the game logic, to ensure purely-functional behavior in certain points. Encodes any changes to the board that could happen in a single update.
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize, Debug, JsonSchema)]
 pub struct BoardUpdate {
     /// Number of pellets collected
@@ -168,12 +180,13 @@ pub struct BoardUpdate {
     /// If we just collected something, the start junction and the end junction as a tuple!
     pub junctions: Option<(u32, u32)>,
     /// If a vulnerable ghost was consumed,
-    pub ghost_consumed: bool,
+    pub ghosts_consumed: i32,
     /// If a telleport occured: 0 = false, 1 = left->right, 2 = right->left
     pub teleport: i32
 }
 
 #[derive(Clone, Serialize, Deserialize, JsonSchema)]
+// Per frame state, duplicate fields to Pacman 
 pub struct StateCore {
     /// Where are random numbers drawn from?
     pub rand: random::Gen,
@@ -185,14 +198,16 @@ pub struct StateCore {
     pub level: i32,
     /// The position and state of the player.
     pub player: Mob,
-    /// Are the enemies vulnerable 
-    pub enemies_vulenerable: bool,
-    //  How much longer are the ghosts vulnerable for 
-    pub vulnerability_timer: i32,
+    /// If player catches more than one enemy during a powerup, they will earn more score
+    pub enemies_caught_multiplier: i32,
     /// The position and other state for the enemies.
     pub enemies: Vec<Mob>, // vector or Mobs
     /// A representation of the current game board.
     pub board: Board,
+    /// Timer representing how much longer the ghosts are vulnerable for 
+    pub vulnerability_timer: i32,
+    /// How many lives Pacman has gained through score: relevant for increasing lived every 10k score
+    pub lives_gained: i32,
 }
 
 
@@ -215,3 +230,4 @@ pub enum EnemyPlayerState {
     /// In chase mode, the player just caught the given enemy (id by index in state.enemies list!)
     EnemyCatch(usize),
 }
+

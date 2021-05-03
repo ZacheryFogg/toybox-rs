@@ -13,12 +13,12 @@ use rand::seq::SliceRandom;
 // this is a public module that is just defining some basic constants about screen size
 pub mod screen {
     // Declare a public constant that is the game size in pixels of two integer32bit vals
-    pub const GAME_SIZE: (i32, i32) = (500, 500);
+    pub const GAME_SIZE: (i32, i32) = (160, 250);
     // offset of board from left top corner
     pub const BOARD_OFFSET: (i32, i32) = (16, 37);
     pub const PLAYER_SIZE: (i32, i32) = (7, 7);
     pub const ENEMY_SIZE: (i32, i32) = (7, 7);
-    pub const TILE_SIZE: (i32, i32) = (8, 8);
+    pub const TILE_SIZE: (i32, i32) = (4, 5);
 
     // The screen positons of the player live markers 
     pub const LIVES_Y_POS: i32 = 198;

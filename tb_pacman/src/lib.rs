@@ -7,9 +7,14 @@ extern crate lazy_static;
 extern crate schemars;
 extern crate rand;
 
-pub mod amidar;
+// pub mod amidar;
+pub mod pacman;
 mod digit_sprites;
-mod types;
+// mod types;
+mod typespacman;
 
-pub use crate::types::Amidar as Pacman;
-pub use crate::types::State;
+
+
+// pub use crate::types::Amidar as Pacman;
+pub use crate::typespacman::Pacman;
+pub use crate::typespacman::State;
